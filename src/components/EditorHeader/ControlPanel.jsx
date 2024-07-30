@@ -30,7 +30,7 @@ import {
   jsonToSQLite,
   jsonToMariaDB,
   jsonToSQLServer,
-  jsonToOracle,
+  jsonToOracleSQL,
 } from "../../utils/exportSQL/generic";
 import {
   ObjectType,
@@ -1151,9 +1151,9 @@ export default function ControlPanel({
               },
             },
             {
-              Oracle: () => {
+              OracleSQL: () => {
                 setModal(MODAL.CODE);
-                const src = jsonToOracle({
+                const src = jsonToOracleSQL({
                   tables: tables,
                   references: relationships,
                   types: types,
@@ -1164,7 +1164,7 @@ export default function ControlPanel({
                   data: src,
                   extension: "sql",
                 }));
-              }
+              },
             },
           ],
         }),

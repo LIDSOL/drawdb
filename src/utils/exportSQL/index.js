@@ -2,6 +2,7 @@ import { DB } from "../../data/constants";
 import { toMariaDB } from "./mariadb";
 import { toMSSQL } from "./mssql";
 import { toMySQL } from "./mysql";
+import { toOracleSQL } from "./oraclesql";
 import { toPostgres } from "./postgres";
 import { toSqlite } from "./sqlite";
 import { toOracle } from "./oracle";
@@ -19,7 +20,7 @@ export function exportSQL(diagram) {
     case DB.MSSQL:
       return toMSSQL(diagram);
     case DB.ORACLE:
-      return toOracle(diagram);
+      return toOracleSQL(diagram);
     default:
       return "";
   }

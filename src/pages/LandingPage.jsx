@@ -8,6 +8,7 @@ import mysql_icon from "../assets/mysql.png";
 import postgres_icon from "../assets/postgres.png";
 import sqlite_icon from "../assets/sqlite.png";
 import mariadb_icon from "../assets/mariadb.png";
+import oraclesql_icon from "../assets/oraclesql.png";
 import sql_server_icon from "../assets/sql-server.png";
 import discord from "../assets/discord.png";
 import github from "../assets/github.png";
@@ -202,19 +203,36 @@ export default function LandingPage() {
         </FadeIn>
       </div>
 
-      {/* Tweets */}
+      {/* Supported Databases */}
       <div className="px-40 mt-6 md:px-8">
         <div className="text-center text-2xl md:text-xl font-medium">
-          What the internet says about us
+          Supported Databases
         </div>
-        <div
-          data-theme="light"
-          className="grid grid-cols-2 place-items-center md:grid-cols-1"
-        >
-          <Tweet id="1816111365125218343" />
-          <Tweet id="1817933406337905021" />
-          <Tweet id="1785457354777006524" />
-          <Tweet id="1776842268042756248" />
+        <div className="grid grid-cols-3 grid-rows-2 gap-y-[4rem] place-items-center items-baseline sm:grid-cols-1 sm:grid-rows-1 sm:gap-10">
+          <img
+            src={mysql_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-20"
+          />
+          <img
+            src={postgres_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-12"
+          />
+          <img
+            src={sqlite_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-16"
+          />
+          <img
+            src={mariadb_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-16"
+          />
+          <img
+            src={sql_server_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-16"
+          />
+          <img
+            src={oraclesql_icon}
+            className="opacity-70 hover:opacity-100 transition-all duration-300 h-16 scale-[300%]"
+          />
         </div>
       </div>
 
