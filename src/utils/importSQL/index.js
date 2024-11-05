@@ -9,6 +9,7 @@ import { fromMSSQL } from "./mssql";
 import { fromMySQL } from "./mysql";
 import { fromPostgres } from "./postgres";
 import { fromSQLite } from "./sqlite";
+import { fromOracle } from "./oracle.js";
 
 export function importSQL(ast, toDb = DB.MYSQL, diagramDb = DB.GENERIC) {
   let diagram;
@@ -27,6 +28,9 @@ export function importSQL(ast, toDb = DB.MYSQL, diagramDb = DB.GENERIC) {
       break;
     case DB.MSSQL:
       diagram = fromMSSQL(ast, diagramDb);
+      break;
+    case DB.ORACLE:
+      diagram = fromOracle(ast, diagramDb);
       break;
     default:
       diagram = { tables: [], relationships: [] };

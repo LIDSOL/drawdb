@@ -12,6 +12,8 @@ function quoteColumn(str, db) {
       return `[${str}]`;
     case DB.MARIADB:
       return `\`${str}\``;
+    case DB.ORACLE:
+      return `"${str}"`;
   }
 }
 
