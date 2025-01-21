@@ -1,5 +1,4 @@
 import { parseDefault } from "./shared";
-import { dbToTypes } from "../../data/datatypes";
 
 export function toOracle(diagram) {
   return `${diagram.tables
@@ -13,9 +12,9 @@ export function toOracle(diagram) {
               }${field.notNull ? " NOT NULL" : ""}`
           )
           .join(",\n")}${
-          table.fields.filter((f) => f.unique).length > 0
+          table.fields.filter((f) => f.unique && !f.primary).length > 0
             ? `,\n\t${table.fields
-                .filter((f) => f.unique)
+                .filter((f) => f.unique && !f.primary)
                 .map((f) => `CONSTRAINT ${table.name}_${f.name}_uk UNIQUE("${f.name}")`)
                 .join(",\n\t")}`
             : ""
