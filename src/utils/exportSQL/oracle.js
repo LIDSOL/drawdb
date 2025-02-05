@@ -22,7 +22,7 @@ export function toOracle(diagram) {
           table.fields.filter((f) => f.check).length > 0
             ? `,\n\t${table.fields
                 .filter((f) => f.check)
-                .map((f) => `CONSTRAINT ${table.name}_${f.name}_chk CHECK("${f.name}"${f.check})`)
+                .map((f) => `CONSTRAINT ${table.name}_${f.name}_chk CHECK("${f.name}" ${f.check})`)
                 .join(",\n\t")}`
             : ""
         }${
