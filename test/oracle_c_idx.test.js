@@ -1,3 +1,4 @@
+/* eslint-env jest */
 import { toOracle } from "../src/utils/exportSQL/oracle.js";
 import { DB } from "../src/data/constants.js";
 
