@@ -62,28 +62,13 @@ export default function Table(props) {
     }
   };
 
-  // Checar si hay overflow
-  // Mientras haya overflow: crecer la tabla por 5 pixel
-
-  function findLongestChild() {
-    let longestChild = 0;
-    tableData.fields.forEach((field) => {
-      const fieldLength = field.name.length * 20;
-      //const fieldTypeLength = field.type.length * 20
-      if (fieldLength > longestChild) {
-        longestChild = fieldLength;
-      }
-    });
-    return longestChild;
-  }
-
   return (
     <>
       <foreignObject
         key={tableData.id}
         x={tableData.x}
         y={tableData.y}
-        width={Math.max(settings.tableWidth, findLongestChild())}
+        width={settings.tableWidth}
         height={height}
         className="group drop-shadow-lg rounded-md cursor-move"
         onPointerDown={onPointerDown}
@@ -301,7 +286,7 @@ export default function Table(props) {
           index === tableData.fields.length - 1
             ? ""
             : "border-b border-gray-400"
-        } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-visible`} // FLAG
+        } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`} 
         onPointerEnter={(e) => {
           if (!e.isPrimary) return;
 
@@ -325,7 +310,7 @@ export default function Table(props) {
         <div
           className={`${
             hoveredField === index ? "text-zinc-400" : ""
-          } flex items-center gap-2 `} // LOL
+          } flex items-center gap-2 overflow-hidden`}
         >
           <button
             className="flex-shrink-0 w-[10px] h-[10px] bg-[#2f68adcc] rounded-full"
