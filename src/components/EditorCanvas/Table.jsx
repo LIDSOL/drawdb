@@ -286,7 +286,7 @@ export default function Table(props) {
           index === tableData.fields.length - 1
             ? ""
             : "border-b border-gray-400"
-        } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`}
+        } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`} 
         onPointerEnter={(e) => {
           if (!e.isPrimary) return;
 
@@ -339,7 +339,7 @@ export default function Table(props) {
               }));
             }}
           />
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+          <span className="text-ellipsis whitespace-nowrap">
             {fieldData.name}
           </span>
         </div>
@@ -356,8 +356,6 @@ export default function Table(props) {
             />
           ) : (
             <div className="flex gap-1 items-center">
-              {fieldData.primary && <IconKeyStroked />}
-              {!fieldData.notNull && <span>?</span>}
               <span>
                 {fieldData.type +
                   ((dbToTypes[database][fieldData.type].isSized ||
@@ -367,6 +365,9 @@ export default function Table(props) {
                     ? "(" + fieldData.size + ")"
                     : "")}
               </span>
+              {!fieldData.notNull && <span>null</span>}
+              {fieldData.notNull && <span>not null</span>}  
+              {fieldData.primary && <IconKeyStroked />}  
             </div>
           )}
         </div>
