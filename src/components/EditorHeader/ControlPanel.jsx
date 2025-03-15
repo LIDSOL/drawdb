@@ -1056,7 +1056,7 @@ export default function ControlPanel({
             {
               Oracle: () => {
                 setModal(MODAL.IMPORT_SRC);
-                setImportDb(DB.ORACLE);
+                setImportDb(DB.ORACLESQL);
               },
             },
           ],
