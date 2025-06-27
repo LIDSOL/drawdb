@@ -1,12 +1,21 @@
 import { createContext, useState } from "react";
 import { Action, DB, ObjectType, defaultBlue } from "../data/constants";
-import { useTransform, useUndoRedo, useSelect } from "../hooks";
+import { useTransform, useUndoRedo, useSelect,useSettings } from "../hooks";
 import { Toast } from "@douyinfe/semi-ui";
 import { useTranslation } from "react-i18next";
 
 export const DiagramContext = createContext(null);
 
 export default function DiagramContextProvider({ children }) {
+  const { settings } = useSettings();
+    const generateFKName = (template, table1Name, field1Name, table2Name,field2Name) => {
+    let name = template;
+    name = name.replace(/{table1}/g, table1Name || '');
+    name = name.replace(/{table2}/g, table2Name || '');
+    name = name.replace(/{field1}/g, field1Name || '');
+    name = name.replace(/{field2}/g, field2Name || ''); 
+    return name;
+  };
   const { t } = useTranslation();
   const [database, setDatabase] = useState(DB.GENERIC);
   const [tables, setTables] = useState([]);
@@ -27,13 +36,13 @@ export default function DiagramContextProvider({ children }) {
         ...prev,
         {
           id: prev.length,
-          name: `table_${prev.length}`,
+          name: settings.upperCaseFields ? `TABLE_${prev.length}` : `table_${prev.length}`,
           x: transform.pan.x,
           y: transform.pan.y,
           fields: [
             {
-              name: "id",
-              type: database === DB.GENERIC ? "INT" : "INTEGER",
+              name: settings.upperCaseFields ? "ID" : "id",
+              type: database === DB.GENERIC ? "INT" : database === DB.ORACLE ? "NUMBER" : "INTEGER",
               default: "",
               check: "",
               primary: true,
@@ -78,7 +87,7 @@ export default function DiagramContextProvider({ children }) {
         {
           action: Action.DELETE,
           element: ObjectType.TABLE,
-          data: { table: tables[id], relationship: rels },
+          data:  { table: tables[id], relationship: rels }, 
           message: t("delete_table", { tableName: tables[id].name }),
         },
       ]);
@@ -137,16 +146,16 @@ export default function DiagramContextProvider({ children }) {
 
   const deleteField = (field, tid, addToHistory = true) => {
     const currentTable = tables[tid];
-  
+
     // If table has a composite pk
     const pkFieldIds = currentTable.fields.filter(f => f.primary).map(f => f.id);
     const isPartOfCompositePK = field.primary && pkFieldIds.length > 1;
-  
+
     // If the field is a composite FK
     const isPartOfCompositeFK = (() => {
       if (!field.foreignK) return false;
       const fkTableId = field.foreignKey.tableId;
-  
+
       // Get all the fields Fk pointing to the same tables
       const relatedFKs = tables[tid].fields.filter(
         f =>
@@ -155,28 +164,28 @@ export default function DiagramContextProvider({ children }) {
       );
       return relatedFKs.length > 1;
     })();
-  
+
     // get associated relationships
     let affectedRelationships = relationships.filter(
       (r) =>
         (r.startTableId === tid && r.startFieldId === field.id) ||
         (r.endTableId === tid && r.endFieldId === field.id)
     );
-  
+
     // If PKs is composite, get all its relationships
     if (isPartOfCompositePK) {
       affectedRelationships = relationships.filter(
         (r) => r.startTableId === tid && pkFieldIds.includes(r.startFieldId)
       );
     }
-  
+
     // If FKs is composite, get all its relationships
     if (isPartOfCompositeFK && field.foreignK) {
       const fkTableId = field.foreignKey.tableId;
       const relatedFKFieldIds = tables[tid].fields
         .filter(f => f.foreignK && f.foreignKey.tableId === fkTableId)
         .map(f => f.id);
-  
+
       affectedRelationships = relationships.filter(
         (r) => r.endTableId === tid && relatedFKFieldIds.includes(r.endFieldId)
       );
@@ -216,7 +225,7 @@ export default function DiagramContextProvider({ children }) {
       ]);
       setRedoStack([]);
     }
-  
+
     // Delete relationships
     setRelationships((prev) => {
       const affectedRelIds = new Set(affectedRelationships.map((r) => r.id));
@@ -240,9 +249,9 @@ export default function DiagramContextProvider({ children }) {
 
       return temp;
     });
-  
+
     const updatedTables = [...tables];
-  
+
     // Delete FKs in child tables if a composite PK is deleted
     if (isPartOfCompositePK) {
       affectedRelationships.forEach((rel) => {
@@ -258,7 +267,7 @@ export default function DiagramContextProvider({ children }) {
           .map((f, i) => ({ ...f, id: i }));
       });
     }
-  
+
     // Delete FKs in child tables if a composite FK is deleted
     if (isPartOfCompositeFK && field.foreignK) {
       const fkTableId = field.foreignKey.tableId;
@@ -273,7 +282,7 @@ export default function DiagramContextProvider({ children }) {
         )
         .map((f, i) => ({ ...f, id: i }));
     }
-  
+
     // Delete any FK references in other tables
     updatedTables.forEach((table) => {
       table.fields = table.fields.filter(
@@ -285,20 +294,41 @@ export default function DiagramContextProvider({ children }) {
           )
       );
     });
-  
+
     // Delete the field from the table
     updatedTables[tid].fields = updatedTables[tid].fields
       .filter((f) => f.id !== field.id)
       .map((f, i) => ({ ...f, id: i }));
-  
+
     // Update the tables state
     updatedTables.forEach((table) => updateTable(table.id, { fields: table.fields }));
-  };  
+  };
 
   const addRelationship = (data, addToHistory = true) => {
+    const startTableName = tables[data.startTableId]?.name;
+    const startFieldName = tables[data.startTableId]?.fields[data.startFieldId]?.name;
+    const endTableName = tables[data.endTableId]?.name;
+    const endFieldName = tables[data.endTableId]?.fields[data.endFieldId]?.name; 
+
+    const generatedDefaultName = generateFKName(
+      settings.fkConstraintNaming.template,
+      startTableName,
+      startFieldName,
+      endTableName,
+      endFieldName 
+    );
+    let relationshipToAdd; 
+    setRelationships((prev) => {
+      relationshipToAdd = { // Asigna el objeto final aquí
+     ...data,
+      id: prev.length,
+      isCustomName: data.isCustomName !== undefined ? data.isCustomName : false,
+      name: data.isCustomName ? data.name : generatedDefaultName,
+      };
+      return [...prev, relationshipToAdd];
+      });
+
     if (addToHistory) {
-      // First, update the relationships
-      setRelationships((prev) => [...prev, data]);
   
       // After that, update the component undo stack
       setUndoStack((prevUndo) => [
@@ -306,34 +336,97 @@ export default function DiagramContextProvider({ children }) {
         {
           action: Action.ADD,
           element: ObjectType.RELATIONSHIP,
-          data: data,
+          data: relationshipToAdd,
           message: t("add_relationship"),
         },
       ]);
       setRedoStack([]);
-    } else {
-      setRelationships((prev) => {
-        const temp = prev.slice();
-        temp.splice(data.id, 0, data);
-        return temp.map((t, i) => ({ ...t, id: i }));
-      });
+      const childTable = tables[data.endTableId];
+      const parentTable = tables[data.startTableId];
+      const parentField = parentTable?.fields?.find(f => f.id === data.startFieldId);
+      if (childTable && parentTable && parentField) {
+        // Verificar si el campo FK ya existe para evitar duplicados (importante si se llama varias veces)
+        const fkExists = childTable.fields.some(
+          (f) =>
+            f.foreignK &&
+            f.foreignKey?.tableId === data.startTableId &&
+            f.foreignKey?.fieldId === data.startFieldId
+        );
 
-      const tableIndex = data.endTableId;
-      if(tables[tableIndex]){
-
-        const currentFields = tables[tableIndex].fields;
-        const fieldToInsert = data.endField[0];
-        const exists = currentFields.some((field) => field.id === fieldToInsert.id);
-
-        if (!exists){
-          const newFieldsArray = [
-            ...currentFields.slice(0, data.endFieldId),
-            ...data.endField.map((field) => ({...field})),
-            ...currentFields.slice(data.endFieldId),
-          ];
-          updateTable(tableIndex, {
-            fields: newFieldsArray,
+        if (!fkExists) {
+          const newFKField = {
+            id: childTable.fields.length, 
+            name: relationshipToAdd.name, 
+            type: parentField.type,       
+            default: "",
+            check: "",
+            primary: false,
+            unique: false,
+            notNull: false, // Puedes ajustar esto según tus defaults
+            increment: false,
+            comment: "",
+            foreignK: true,
+            foreignKey: {
+              tableId: data.startTableId,
+              fieldId: data.startFieldId,
+            },
+          };
+          updateTable(data.endTableId, {
+            fields: [...childTable.fields, newFKField].map((f, i) => ({ ...f, id: i })), // Re-mapear IDs
           });
+        }
+      }
+    } else {
+        const relationshipToAddNoHistory = {
+          id: data.id !== undefined ? data.id : relationships.length,
+          isCustomName: data.isCustomName || false,
+          name: data.isCustomName ? data.name : generatedDefaultName,
+    };
+      setRelationships((prev) => {
+        const temp = [...prev];
+        if (data.id !== undefined && data.id <= prev.length) {
+            temp.splice(data.id, 0, relationshipToAddNoHistory);
+        } else {
+            temp.push(relationshipToAddNoHistory);
+        }
+        return temp.map((rel, i) => ({ ...rel, id: i }));
+      });
+       const childTable = tables[data.endTableId];
+      const parentTable = tables[data.startTableId];
+      const parentField = parentTable?.fields?.find(f => f.id === data.startFieldId);
+
+      if (childTable && parentTable && parentField) {
+        const fkExists = childTable.fields.some(
+          (f) =>
+            f.foreignK &&
+            f.foreignKey?.tableId === data.startTableId &&
+            f.foreignKey?.fieldId === data.startFieldId
+        );
+
+        if (!fkExists) {
+            // Usa el nombre que la relación ya tiene (data.name) si es personalizado,
+            // o el generado por defecto.
+            const fkFieldName = data.name || generatedDefaultName; 
+            const newFKField = {
+              id: childTable.fields.length, // Nuevo ID para el campo
+              name: fkFieldName, 
+              type: parentField.type,
+              default: "",
+              check: "",
+              primary: false,
+              unique: false,
+              notNull: false,
+              increment: false,
+              comment: "",
+              foreignK: true,
+              foreignKey: {
+                tableId: data.startTableId,
+                fieldId: data.startFieldId,
+              },
+            };
+            updateTable(data.endTableId, {
+               fields: [...childTable.fields, newFKField],
+            });
         }
       }
     }
@@ -381,10 +474,13 @@ export default function DiagramContextProvider({ children }) {
   };
 
   const updateRelationship = (id, updatedValues) => {
-    setRelationships((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updatedValues } : t)),
+    setRelationships((prev) =>{
+      const updated = prev.map((rel) =>
+      rel.id === id ? { ...rel, ...updatedValues } : rel
     );
-  };
+    return[...updated];
+  });
+};
 
   return (
     <DiagramContext.Provider

@@ -1,5 +1,5 @@
 import { createContext, useEffect, useState } from "react";
-import { tableWidth } from "../data/constants";
+import { tableWidth, DB } from "../data/constants"; 
 
 const defaultSettings = {
   strictMode: false,
@@ -12,6 +12,29 @@ const defaultSettings = {
   showRelationshipLabels: true,
   tableWidth: tableWidth,
   showDebugCoordinates: false,
+  
+  databaseType: DB.MYSQL,
+  fkConstraintNaming: {
+    template: "{table1}_{table2}_{field1}_fk",
+  },
+  indexNaming: {
+    template: "{table}_{indexType}_{fields}_idx",
+  },
+  defaultNewTableFieldProps: {
+    type: "VARCHAR",
+    size: 255,
+    default: null,
+    notNull: false,
+    primary: false,
+    unique: false,
+    increment: false,
+    comment: "",
+    foreignK: false,
+  },
+  defaultFieldType: 'INTEGER',
+  defaultTextSize: 40,
+  upperCaseFields: false,
+  defaultNotNull: false
 };
 
 export const SettingsContext = createContext(defaultSettings);
@@ -22,7 +45,24 @@ export default function SettingsContextProvider({ children }) {
   useEffect(() => {
     const settings = localStorage.getItem("settings");
     if (settings) {
-      setSettings(JSON.parse(settings));
+      const parsedSettings = JSON.parse(settings);
+      setSettings(prevSettings => ({// eslint-disable-line no-unused-vars
+        ...defaultSettings, 
+        ...parsedSettings, 
+        fkConstraintNaming: {
+          ...defaultSettings.fkConstraintNaming,
+          ...(parsedSettings.fkConstraintNaming || {})
+        },
+        indexNaming: {
+          ...defaultSettings.indexNaming,
+          ...(parsedSettings.indexNaming || {})
+        },
+        defaultNewTableFieldProps: {
+          ...defaultSettings.defaultNewTableFieldProps,
+          ...(parsedSettings.defaultNewTableFieldProps || {})
+        }
+      }));
+      
     }
   }, []);
 

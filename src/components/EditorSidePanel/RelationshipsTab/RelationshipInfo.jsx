@@ -22,7 +22,7 @@ import { useDiagram, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-
+import  {useSettings}  from "../../../hooks";
 const columns = [
   {
     title: i18n.t("primary"),
@@ -35,55 +35,81 @@ const columns = [
 ];
 
 export default function RelationshipInfo({ data }) {
+  const { settings } = useSettings();
   const { setUndoStack, setRedoStack } = useUndoRedo();
   const { tables, setRelationships, deleteRelationship, updateRelationship } =
     useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
-
+  const generateFKName=(template,tableName,fieldName,table2Name,field2Name = '')=>{
+    let name=template;
+    name = name.replace(/{table1}/g, tableName || ''); 
+    name = name.replace(/{table2}/g, table2Name || '');
+    name = name.replace(/{field1}/g, fieldName || '');
+    name = name.replace(/{field2}/g, field2Name || '');
+    
+    return name;
+  };
   const swapKeys = () => {
+    const current = {
+    startTableId: data.startTableId,
+    endTableId: data.endTableId,
+    startFieldId: data.startFieldId,
+    endFieldId: data.endFieldId,
+    name: data.name,
+    isCustomName: data.isCustomName,
+  };
+
+  const swapped = {
+    startTableId: current.endTableId,
+    startFieldId: current.endFieldId,
+    endTableId: current.startTableId,
+    endFieldId: current.startFieldId,
+  };
+    
     setUndoStack((prev) => [
       ...prev,
       {
         action: Action.EDIT,
         element: ObjectType.RELATIONSHIP,
         rid: data.id,
-        undo: {
-          startTableId: data.startTableId,
-          startFieldId: data.startFieldId,
-          endTableId: data.endTableId,
-          endFieldId: data.endFieldId,
-        },
-        redo: {
-          startTableId: data.endTableId,
-          startFieldId: data.endFieldId,
-          endTableId: data.startTableId,
-          endFieldId: data.startFieldId,
-        },
+        undo: current,
+
+        redo: swapped,
         message: t("edit_relationship", {
-          refName: data.name,
+          refName: current.name,
           extra: "[swap keys]",
         }),
       },
     ]);
     setRedoStack([]);
     setRelationships((prev) =>
-      prev.map((e, idx) =>
-        idx === data.id
-          ? {
-              ...e,
-              name: `fk_${tables[e.endTableId].name}_${
-                tables[e.endTableId].fields[e.endFieldId].name
-              }_${tables[e.startTableId].name}`,
-              startTableId: e.endTableId,
-              startFieldId: e.endFieldId,
-              endTableId: e.startTableId,
-              endFieldId: e.startFieldId,
-            }
-          : e,
-      ),
-    );
-  };
+      prev.map((e, idx) => {
+        if (idx === data.id) {
+        const isCustom = e.isCustomName;
+        const nameAfterSwap = isCustom
+         ? e.name
+          : generateFKName(
+             settings.fkConstraintNaming.template,
+              tables[e.endTableId]?.name,
+              tables[e.endTableId]?.fields?.[e.endFieldId]?.name,
+              tables[e.startTableId]?.name,
+              tables[e.startTableId]?.fields?.[e.startFieldId]?.name
+            );
+
+        return {
+        ...e,
+        name: nameAfterSwap,
+        startTableId: e.endTableId,
+        startFieldId: e.endFieldId,
+        endTableId: e.startTableId,
+        endFieldId: e.startFieldId,
+      };
+    }
+    return e;
+  })
+);
+};
 
   const changeCardinality = (value) => {
     setUndoStack((prev) => [
@@ -143,6 +169,7 @@ export default function RelationshipInfo({ data }) {
           onFocus={(e) => setEditField({ name: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
+            updateRelationship(data.id, { name: e.target.value, isCustomName: true });
             setUndoStack((prev) => [
               ...prev,
               {
@@ -150,8 +177,8 @@ export default function RelationshipInfo({ data }) {
                 element: ObjectType.RELATIONSHIP,
                 component: "self",
                 rid: data.id,
-                undo: editField,
-                redo: { name: e.target.value },
+                undo: { name: editField.name, isCustomName: data.isCustomName },
+                redo:  { name: e.target.value, isCustomName: true },
                 message: t("edit_relationship", {
                   refName: e.target.value,
                   extra: "[name]",
@@ -165,11 +192,11 @@ export default function RelationshipInfo({ data }) {
       <div className="flex justify-between items-center mb-3">
         <div className="me-3">
           <span className="font-semibold">{t("primary")}: </span>
-          {tables[data.endTableId].name}
+          {tables?.[data.endTableId]?.name ?? ""}
         </div>
         <div className="mx-1">
           <span className="font-semibold">{t("foreign")}: </span>
-          {tables[data.startTableId].name}
+          {tables?.[data.startTableId]?.name ?? ""}
         </div>
         <div className="ms-1">
           <Popover
