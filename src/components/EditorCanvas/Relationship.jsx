@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import {
-  Cardinality,
+  RelationshipType,
+  RelationshipCardinalities,
+  ParentCardinality,
   darkBgTheme,
   Notation,
   ObjectType,
@@ -14,7 +16,15 @@ import { useDiagram, useSettings, useLayout, useSelect } from "../../hooks";
 import { useTranslation } from "react-i18next";
 import { SideSheet } from "@douyinfe/semi-ui";
 import RelationshipInfo from "../EditorSidePanel/RelationshipsTab/RelationshipInfo";
-import { CrowOM, CrowOO, CrowZM, IDEFZM, DefaultNotation } from "./RelationshipFormat";
+
+import {
+  CrowParentLines,
+  CrowParentDiamond,
+  CrowsFootChild,
+  IDEFZM,
+  DefaultNotation
+} from "./RelationshipFormat";
+
 
 const labelFontSize = 16;
 
@@ -47,7 +57,6 @@ export default function Relationship({ data }) {
       return groupA - groupB;
     });
   };
-
   const startTable = tables[data.startTableId];
   const endTable = tables[data.endTableId];
 
@@ -81,26 +90,58 @@ export default function Relationship({ data }) {
   }
   const relationshipType = determinedRelationshipType ?? data.lineType ?? "0";
 
+  const getForeignKeyFields = () => {
+    if(!endTable || !endTable.fields) return [];
+
+    if(Array.isArray(data.endFieldId)){
+      return endTable.fields.filter(f => data.endFieldId.includes(f.id));
+    } else if (data.endFieldId !== undefined) {
+      return endTable.fields.filter(f => f.id === data.endFieldId);
+    }
+    return [];
+  };
+
   let direction = 1;
   let cardinalityStart = "1";
   let cardinalityEnd = "1";
 
+  const isCrowOrIDEF = settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X;
+  const isDefault = settings.notation === Notation.DEFAULT;
+  const fkFields = getForeignKeyFields();
+
+  if (isCrowOrIDEF) {
+    const allNullable = fkFields.length > 0 && fkFields.every(field => !field.notNull);
+    cardinalityStart = allNullable
+      ? ParentCardinality.NULLEABLE.label
+      : ParentCardinality.DEFAULT.label;
+    if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+      cardinalityEnd =
+        data.cardinality ||
+        RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label;
+    } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+      cardinalityEnd =
+        data.cardinality ||
+        RelationshipCardinalities[RelationshipType.ONE_TO_MANY][0].label;
+    }
+  } else if (isDefault) {
+    cardinalityStart = "1";
+    cardinalityEnd = data.relationshipType === RelationshipType.ONE_TO_MANY ? "n" : "1";
+  }
   const formats = {
     notation: {
       default: {
         one_to_one: DefaultNotation,
         one_to_many: DefaultNotation,
-        zero_to_many: DefaultNotation,
       },
       crows_foot: {
-        one_to_one: CrowOO,
-        one_to_many: CrowOM,
-        zero_to_many: CrowZM,
+        child: CrowsFootChild,
+        parent_lines: CrowParentLines,
+        parent_diamond: CrowParentDiamond,
       },
       idef1x: {
         one_to_one: IDEFZM,
         one_to_many: IDEFZM,
-        zero_to_many: IDEFZM,
+        parent_diamond: CrowParentDiamond,
       },
     }
   };
@@ -111,22 +152,36 @@ export default function Relationship({ data }) {
 
   const currentNotation = formats.notation[effectiveNotationKey];
 
-  switch (data.cardinality) {
-    case t(Cardinality.ONE_TO_MANY):
-    case Cardinality.ONE_TO_MANY:
-      cardinalityStart = effectiveNotationKey === Notation.DEFAULT ? "1" : "(1,1)";
-      cardinalityEnd = effectiveNotationKey === Notation.DEFAULT ? "n" : "(1,*)";
-      break;
-    case t(Cardinality.ONE_TO_ONE):
-    case Cardinality.ONE_TO_ONE:
-      cardinalityStart = effectiveNotationKey === Notation.DEFAULT ? "1" : "(1,1)";
-      cardinalityEnd = effectiveNotationKey === Notation.DEFAULT ? "1" : "(1,1)";
-      break;
-    case t(Cardinality.ZERO_TO_MANY):
-    case Cardinality.ZERO_TO_MANY:
-      cardinalityStart = effectiveNotationKey === Notation.DEFAULT ? "0" : "(0,1)";
-      cardinalityEnd = effectiveNotationKey === Notation.DEFAULT ? "n" : "(0,*)";
-      break;
+  let parentFormat = null;
+  if (settings.notation === Notation.CROWS_FOOT) {
+    if (cardinalityStart === "(1,1)") {
+      parentFormat = currentNotation.parent_lines;
+    } else if (cardinalityStart === "(0,1)") {
+      parentFormat = currentNotation.parent_diamond;
+    }
+  } else if (settings.notation === Notation.IDEF1X) {
+    if (cardinalityStart === "(0,1)") {
+      parentFormat = currentNotation.parent_diamond;
+    }
+  }
+
+  let childFormat;
+  if (settings.notation === Notation.CROWS_FOOT) {
+    childFormat = currentNotation.child;
+  } else if (settings.notation === Notation.IDEF1X) {
+      if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+        childFormat = currentNotation.one_to_one;
+      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+        childFormat = currentNotation.one_to_many;
+    }
+  } else {
+    if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+      childFormat = currentNotation.one_to_one;
+    }
+    else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+      childFormat = currentNotation.one_to_many;
+    }
+
   }
 
   const pathData = {
@@ -250,6 +305,12 @@ export default function Relationship({ data }) {
           strokeDasharray={relationshipType}
           strokeWidth={2}
         />
+
+        {parentFormat && parentFormat(
+          cardinalityStartX,
+          cardinalityStartY,
+          direction,
+
         {usedBreakpoints.map((bp, idx) => (
           <circle
             key={idx}
@@ -262,7 +323,9 @@ export default function Relationship({ data }) {
             onPointerDown={(e) => handleBpPointerDown(e, idx)}
           />
         ))}
-        {settings.showCardinality && currentNotation.one_to_one && (
+
+        /*
+         {settings.showCardinality && currentNotation.one_to_one && (
           <>
             {currentNotation.one_to_one(
               pathRef,
@@ -275,7 +338,30 @@ export default function Relationship({ data }) {
               cardinalityEnd,
             )}
           </>
+          */
         )}
+        {settings.notation === 'default' && settings.showCardinality && childFormat && childFormat(
+          pathRef,
+          cardinalityEndX,
+          cardinalityEndY,
+          cardinalityStartX,
+          cardinalityStartY,
+          direction,
+          cardinalityStart,
+          cardinalityEnd
+        )}
+        {settings.notation !== 'default' && childFormat && childFormat(
+          pathRef,
+          cardinalityEndX,
+          cardinalityEndY,
+          cardinalityStartX,
+          cardinalityStartY,
+          direction,
+          cardinalityStart,
+          cardinalityEnd,
+          settings.showCardinality
+        )}
+
         {settings.showRelationshipLabels && (
           <>
             <rect
