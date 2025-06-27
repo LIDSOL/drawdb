@@ -9,8 +9,6 @@ export default function Defaults() {
   const { settings, setSettings } = useSettings();
   const { database } = useDiagram(); 
 
-  const databaseType = settings.databaseType || 'mysql'; 
-  const typeOptions = Object.keys(dbToTypes[database] || {}).map(type => ({ label: type, value: type }));
 
   const [editingFKNamingTemplate, setEditingFKNamingTemplate] = useState(settings.fkConstraintNaming?.template || "");
   const [editingIndexNamingTemplate, setEditingIndexNamingTemplate] = useState(settings.indexNaming?.template || "");

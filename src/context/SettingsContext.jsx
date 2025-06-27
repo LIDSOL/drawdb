@@ -15,7 +15,7 @@ const defaultSettings = {
   
   databaseType: DB.MYSQL,
   fkConstraintNaming: {
-    template: "{table1}_{table2}_{field1}_{field2}_fk",
+    template: "{table1}_{table2}_{field1}_fk",
   },
   indexNaming: {
     template: "{table}_{indexType}_{fields}_idx",
@@ -46,8 +46,8 @@ export default function SettingsContextProvider({ children }) {
     const settings = localStorage.getItem("settings");
     if (settings) {
       const parsedSettings = JSON.parse(settings);
-      setSettings(prevSettings => ({
-        ...defaultSettings, // Start with all default properties
+      setSettings(prevSettings => ({// eslint-disable-line no-unused-vars
+        ...defaultSettings, 
         ...parsedSettings, 
         fkConstraintNaming: {
           ...defaultSettings.fkConstraintNaming,
@@ -62,7 +62,7 @@ export default function SettingsContextProvider({ children }) {
           ...(parsedSettings.defaultNewTableFieldProps || {})
         }
       }));
-      //setSettings(JSON.parse(settings));
+      
     }
   }, []);
 

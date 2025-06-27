@@ -66,15 +66,6 @@ export default function RelationshipInfo({ data }) {
     endTableId: current.startTableId,
     endFieldId: current.startFieldId,
   };
-  const nameAfterSwap = current.isCustomName
-    ? current.name
-    : generateFKName(
-        settings.fkConstraintNaming.template,
-        tables[swapped.startTableId]?.name,
-        tables[swapped.startTableId]?.fields[swapped.startFieldId]?.name,
-        tables[swapped.endTableId]?.name,
-        tables[swapped.endTableId]?.fields[swapped.endFieldId]?.name
-      );
     
     setUndoStack((prev) => [
       ...prev,
