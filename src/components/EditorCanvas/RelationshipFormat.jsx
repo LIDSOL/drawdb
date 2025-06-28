@@ -6,18 +6,18 @@ export function CrowParentLines(
   return (
     <>
       <line
-        x1={cardinalityStartX - (15 * direction)}
+        x1={cardinalityStartX - (10 * direction)}
         y1={cardinalityStartY + 10}
-        x2={cardinalityStartX - (15 * direction)}
+        x2={cardinalityStartX - (10 * direction)}
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
         className="group-hover:fill-sky-700"
       />
       <line
-        x1={cardinalityStartX - (10 * direction)}
+        x1={cardinalityStartX - (5 * direction)}
         y1={cardinalityStartY + 10}
-        x2={cardinalityStartX - (10 * direction)}
+        x2={cardinalityStartX - (5 * direction)}
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
@@ -35,10 +35,10 @@ export function CrowParentDiamond(
   return (
     <polygon
       points={`
-        ${cardinalityStartX - (10 * direction)},${cardinalityStartY}
-        ${cardinalityStartX - (15 * direction)},${cardinalityStartY - 5}
-        ${cardinalityStartX - (20 * direction)},${cardinalityStartY}
-        ${cardinalityStartX - (15 * direction)},${cardinalityStartY + 5}
+        ${cardinalityStartX - (5 * direction)},${cardinalityStartY}
+        ${cardinalityStartX - (10 * direction)},${cardinalityStartY - 5}
+        ${cardinalityStartX - (15 * direction)},${cardinalityStartY}
+        ${cardinalityStartX - (10 * direction)},${cardinalityStartY + 5}
       `}
       stroke="gray"
       strokeWidth="2"
@@ -69,40 +69,40 @@ export function CrowsFootChild(
         {isMany && (
           <>
             <line
-              x1={cardinalityEndX - (15 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX} y2={cardinalityEndY - 10}
+              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
+              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY - 7}
               stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
             />
             <line
-              x1={cardinalityEndX - (15 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX} y2={cardinalityEndY + 10}
+              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
+              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY + 7}
               stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
             />
             <line
-              x1={cardinalityEndX - (15 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX} y2={cardinalityEndY}
+              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
+              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY}
               stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
             />
           </>
         )}
         {isOne && (
           <line
-            x1={cardinalityEndX - (12 * direction)} y1={cardinalityEndY + 10}
-            x2={cardinalityEndX - (12 * direction)} y2={cardinalityEndY - 10}
+            x1={cardinalityEndX + (7 * direction)} y1={cardinalityEndY + 10}
+            x2={cardinalityEndX + (7 * direction)} y2={cardinalityEndY - 10}
             stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
           />
         )}
         {isOptional && (
           <circle
-            cx={cardinalityEndX - (16 * direction)} cy={cardinalityEndY}
+            cx={cardinalityEndX + (3 * direction)} cy={cardinalityEndY}
             r="4" stroke="gray" strokeWidth="2" fill="white"
             className="group-hover:stroke-sky-700"
           />
         )}
         {isMandatory && (
           <line
-            x1={cardinalityEndX - (17 * direction)} y1={cardinalityEndY + 10}
-            x2={cardinalityEndX - (17 * direction)} y2={cardinalityEndY - 10}
+            x1={cardinalityEndX + (2 * direction)} y1={cardinalityEndY + 10}
+            x2={cardinalityEndX + (2 * direction)} y2={cardinalityEndY - 10}
             stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
           />
         )}

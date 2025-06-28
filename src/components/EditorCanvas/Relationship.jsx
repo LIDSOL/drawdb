@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   RelationshipType,
   RelationshipCardinalities,
@@ -38,7 +38,14 @@ export default function Relationship({ data }) {
   const pathRef = useRef();
   const labelRef = useRef();
 
-  // Helper function to sort fields (same logic as in Table.jsx)
+  const [breakpoints, setBreakpoints] = useState(data.breakpoints ?? []);
+  const [draggingBpIndex, setDraggingBpIndex] = useState(null);
+
+  const startTable = tables[data.startTableId];
+  const endTable = tables[data.endTableId];
+
+  if (!startTable || !endTable) return null;
+
   const getSortedFields = (fields) => {
     if (!fields) return [];
     return [...fields].sort((a, b) => {
@@ -47,22 +54,12 @@ export default function Relationship({ data }) {
       const aIsFK = a.foreignK === true;
       const bIsFK = b.foreignK === true;
 
-      let groupA;
-      if (aIsPK) groupA = 1;
-      else if (!aIsFK) groupA = 2;
-      else groupA = 3;
+      let groupA = aIsPK ? 1 : !aIsFK ? 2 : 3;
+      let groupB = bIsPK ? 1 : !bIsFK ? 2 : 3;
 
-      let groupB;
-      if (bIsPK) groupB = 1;
-      else if (!bIsFK) groupB = 2;
-      else groupB = 3;
-
-      if (groupA !== groupB) return groupA - groupB;
-      return 0;
+      return groupA - groupB;
     });
   };
-  const startTable = tables[data.startTableId];
-  const endTable = tables[data.endTableId];
 
   let startFieldYOffset = 0;
   let endFieldYOffset = 0;
@@ -72,38 +69,27 @@ export default function Relationship({ data }) {
   if (startTable && startTable.fields && data.startFieldId !== undefined) {
     const sortedStartFields = getSortedFields(startTable.fields);
     const startFieldIndex = sortedStartFields.findIndex(f => f.id === data.startFieldId);
-    if (startFieldIndex !== -1) {
-      startFieldYOffset = totalHeaderHeightForFields + (startFieldIndex * tableFieldHeight) + (tableFieldHeight / 2);
-    } else {
-      // Fallback if field not found, point to middle of table header or top
-      startFieldYOffset = tableHeaderHeight / 2;
-    }
+    startFieldYOffset = startFieldIndex !== -1
+      ? totalHeaderHeightForFields + (startFieldIndex * tableFieldHeight) + (tableFieldHeight / 2)
+      : tableHeaderHeight / 2;
   }
 
   if (endTable && endTable.fields && data.endFieldId !== undefined) {
     const sortedEndFields = getSortedFields(endTable.fields);
     const endFieldIndex = sortedEndFields.findIndex(f => f.id === data.endFieldId);
-    if (endFieldIndex !== -1) {
-      endFieldYOffset = totalHeaderHeightForFields + (endFieldIndex * tableFieldHeight) + (tableFieldHeight / 2);
-    } else {
-      // Fallback, similar to startFieldYOffset
-      endFieldYOffset = tableHeaderHeight / 2;
-    }
+    endFieldYOffset = endFieldIndex !== -1
+      ? totalHeaderHeightForFields + (endFieldIndex * tableFieldHeight) + (tableFieldHeight / 2)
+      : tableHeaderHeight / 2;
   }
 
-  // This part for strokeDasharray remains the same
   let determinedRelationshipType = null;
   if (endTable && endTable.fields && data.endFieldId !== undefined) {
     const foreignKeyField = endTable.fields.find(field => field.id === data.endFieldId);
     if (foreignKeyField) {
-      if (foreignKeyField.primary === true) {
-        determinedRelationshipType = "0";
-      } else {
-        determinedRelationshipType = "5.5"; // Assuming "5.5" is a valid dasharray string like "5,5"
-      }
+      determinedRelationshipType = foreignKeyField.primary ? "0" : "5.5";
     }
   }
-  const relationshipType = determinedRelationshipType !== null ? determinedRelationshipType : (data.lineType || "0");
+  const relationshipType = determinedRelationshipType ?? data.lineType ?? "0";
 
   const getForeignKeyFields = () => {
     if(!endTable || !endTable.fields) return [];
@@ -142,9 +128,10 @@ export default function Relationship({ data }) {
     cardinalityStart = "1";
     cardinalityEnd = data.relationshipType === RelationshipType.ONE_TO_MANY ? "n" : "1";
   }
+
   const formats = {
     notation: {
-      default:  {
+      default: {
         one_to_one: DefaultNotation,
         one_to_many: DefaultNotation,
       },
@@ -159,18 +146,13 @@ export default function Relationship({ data }) {
         parent_diamond: CrowParentDiamond,
       },
     }
-  }
+  };
 
-  const effectiveNotationKey =
-    settings.notation &&
-    Object.prototype.hasOwnProperty.call(
-      formats.notation,
-      settings.notation,
-    )
-      ? settings.notation
-      : Notation.DEFAULT;
+  const effectiveNotationKey = Object.prototype.hasOwnProperty.call(formats.notation, settings.notation)
+    ? settings.notation
+    : Notation.DEFAULT;
 
-    const currentNotation = formats.notation[effectiveNotationKey];
+  const currentNotation = formats.notation[effectiveNotationKey];
 
   let parentFormat = null;
   if (settings.notation === Notation.CROWS_FOOT) {
@@ -189,10 +171,10 @@ export default function Relationship({ data }) {
   if (settings.notation === Notation.CROWS_FOOT) {
     childFormat = currentNotation.child;
   } else if (settings.notation === Notation.IDEF1X) {
-      if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
-        childFormat = currentNotation.one_to_one;
-      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
-        childFormat = currentNotation.one_to_many;
+    if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+      childFormat = currentNotation.one_to_one;
+    } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+      childFormat = currentNotation.one_to_many;
     }
   } else {
     if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
@@ -202,6 +184,53 @@ export default function Relationship({ data }) {
       childFormat = currentNotation.one_to_many;
     }
   }
+
+  const pathData = {
+    ...data,
+    startTable: {
+      x: startTable ? startTable.x : 0,
+      y: startTable ? startTable.y + startFieldYOffset : 0,
+    },
+    endTable: {
+      x: endTable ? endTable.x : 0,
+      y: endTable ? endTable.y + endFieldYOffset : 0,
+    },
+    breakpoints,
+  };
+
+  const { path, startAttach, endAttach, breakpoints: defaultBreakpoints } = calcPath(
+    pathData,
+    settings.tableWidth
+  );
+
+  useEffect(() => {
+    if (!breakpoints?.length) {
+      setBreakpoints(defaultBreakpoints);
+    }
+  }, [startTable, endTable]);
+
+  const handleBpPointerDown = (e, idx) => {
+    e.stopPropagation();
+    setDraggingBpIndex(idx);
+  };
+
+  const handlePointerMove = (e) => {
+    if (draggingBpIndex !== null) {
+      const svg = e.target.ownerSVGElement;
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const cursor = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+      setBreakpoints((prev) => {
+        const updated = [...prev];
+        updated[draggingBpIndex] = { x: cursor.x, y: cursor.y };
+        return updated;
+      });
+    }
+  };
+
+  const handlePointerUp = () => setDraggingBpIndex(null);
 
   let cardinalityStartX = 0;
   let cardinalityEndX = 0;
@@ -215,8 +244,7 @@ export default function Relationship({ data }) {
 
   const cardinalityOffset = 28;
 
-
-  if (pathRef.current) {
+  if (pathRef.current && path) {
     const pathLength = pathRef.current.getTotalLength() - cardinalityOffset;
 
     const labelPoint = pathRef.current.getPointAtLength(pathLength / 2);
@@ -224,88 +252,83 @@ export default function Relationship({ data }) {
     labelY = labelPoint.y + (labelHeight ?? 0) / 2;
 
     const point1 = pathRef.current.getPointAtLength(cardinalityOffset);
-    cardinalityStartX = point1.x;
-    cardinalityStartY = point1.y;
+    cardinalityStartX = startAttach.x;
+    cardinalityStartY = startAttach.y;
 
-    const point2 = pathRef.current.getPointAtLength(
-      pathLength,
-    );
-    cardinalityEndX = point2.x;
-    cardinalityEndY = point2.y;
+    const point2 = pathRef.current.getPointAtLength(pathLength);
+    cardinalityEndX = endAttach.x;
+    cardinalityEndY = endAttach.y; 
   }
 
   const edit = () => {
     if (!layout.sidebar) {
-      setSelectedElement((prev) => ({
-        ...prev,
+      setSelectedElement({
         element: ObjectType.RELATIONSHIP,
         id: data.id,
         open: true,
-      }));
+      });
     } else {
-      setSelectedElement((prev) => ({
-        ...prev,
+      setSelectedElement({
         currentTab: Tab.RELATIONSHIPS,
         element: ObjectType.RELATIONSHIP,
         id: data.id,
         open: true,
-      }));
+      });
       if (selectedElement.currentTab !== Tab.RELATIONSHIPS) return;
-      document
-        .getElementById(`scroll_ref_${data.id}`)
-        .scrollIntoView({ behavior: "smooth" });
+      document.getElementById(`scroll_ref_${data.id}`)?.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  if ((settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && cardinalityEndX < cardinalityStartX){
+  if ((settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && cardinalityEndX < cardinalityStartX) {
     direction = -1;
   }
 
-  const pathData = {
-    ...data,
-    startTable: {
-      x: startTable ? startTable.x : 0,
-      y: startTable ? startTable.y + startFieldYOffset : 0,
-    },
-    endTable: {
-      x: endTable ? endTable.x : 0,
-      y: endTable ? endTable.y + endFieldYOffset : 0,
-    },
-  };
-
   return (
     <>
-      <g className="select-none group" onDoubleClick={edit}>
-        {/* Invisible path for larger hit area */}
+      <g
+        className="select-none group"
+        onDoubleClick={edit}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
         <path
-          d={calcPath(
-            pathData,
-            settings.tableWidth,
-          )}
+          d={path}
           stroke="transparent"
           fill="none"
           strokeWidth={15}
           strokeDasharray={"0"}
           cursor="pointer"
         />
-        {/* Visible path */}
         <path
           ref={pathRef}
-          d={calcPath(
-            pathData,
-            settings.tableWidth,
-          )}
+          d={path}
           stroke="gray"
           className="group-hover:stroke-sky-700"
           fill="none"
           strokeDasharray={relationshipType}
           strokeWidth={2}
         />
+
+        {(breakpoints ?? []).map((bp, idx) => (
+          <circle
+            key={`bp-${idx}`}
+            cx={bp.x}
+            cy={bp.y}
+            r={6}
+            fill="skyblue"
+            stroke="gray"
+            strokeWidth={1}
+            cursor="move"
+            onPointerDown={(e) => handleBpPointerDown(e, idx)}
+          />
+        ))}
+
         {parentFormat && parentFormat(
           cardinalityStartX,
           cardinalityStartY,
           direction,
         )}
+
         {settings.notation === 'default' && settings.showCardinality && childFormat && childFormat(
           pathRef,
           cardinalityEndX,
@@ -316,6 +339,7 @@ export default function Relationship({ data }) {
           cardinalityStart,
           cardinalityEnd
         )}
+
         {settings.notation !== 'default' && childFormat && childFormat(
           pathRef,
           cardinalityEndX,
@@ -361,12 +385,12 @@ export default function Relationship({ data }) {
           selectedElement.open &&
           !layout.sidebar
         }
-        onCancel={() => {
+        onCancel={() =>
           setSelectedElement((prev) => ({
             ...prev,
             open: false,
-          }));
-        }}
+          }))
+        }
         style={{ paddingBottom: "16px" }}
       >
         <div className="sidesheet-theme">
