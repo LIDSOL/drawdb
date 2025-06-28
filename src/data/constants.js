@@ -63,6 +63,13 @@ export const Constraint = {
   SET_DEFAULT: "Set default",
 };
 
+export const SubtypeRestriction = {
+  DISJOINT_TOTAL: "disjoint_total",
+  DISJOINT_PARTIAL: "disjoint_partial",
+  OVERLAPPING_TOTAL: "overlapping_total",
+  OVERLAPPING_PARTIAL: "overlapping_partial",
+};
+
 export const Tab = {
   TABLES: "1",
   RELATIONSHIPS: "2",

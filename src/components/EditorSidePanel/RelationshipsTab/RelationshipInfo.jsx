@@ -6,6 +6,7 @@ import {
   Popover,
   Table,
   Input,
+  Checkbox,
 } from "@douyinfe/semi-ui";
 import {
   IconDeleteStroked,
@@ -16,6 +17,7 @@ import {
   RelationshipType,
   RelationshipCardinalities,
   Constraint,
+  SubtypeRestriction,
   Action,
   ObjectType,
   Notation,
@@ -143,6 +145,54 @@ export default function RelationshipInfo({ data }) {
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id ? { ...e, cardinality: value } : e,
+      ),
+    );
+  };
+
+  const changeSubtypeRestriction = (value) => {
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: data.id,
+        undo: { subtype_restriction: data.subtype_restriction },
+        redo: { subtype_restriction: value },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[subtype_restriction]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, subtype_restriction: value } : e,
+      ),
+    );
+  }
+
+  const toggleSubtype = () => {
+    const prevVal = data.subtype;
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: data.id,
+        undo: { subtype: data.subtype },
+        redo: { subtype: !data.subtype },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[subtype]",
+        }),
+      },
+    ]);
+
+    setRedoStack([]);
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, subtype: !prevVal } : e,
       ),
     );
   };
@@ -330,7 +380,8 @@ export default function RelationshipInfo({ data }) {
               disabled={!data.relationshipType}
               placeholder={t("select_cardinality")}
             />
-            {(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && (
+            {(settings.notation === Notation.CROWS_FOOT ||
+              settings.notation === Notation.IDEF1X) && (
               <Button
                 icon={<IconLoopTextStroked />}
                 type="tertiary"
@@ -339,6 +390,33 @@ export default function RelationshipInfo({ data }) {
               />
             )}
           </div>
+
+          {/* 👇 Aquí ya es otra fila separada */}
+          <Row gutter={6} className="my-3">
+            <Col span={12}>
+              <div className="font-semibold my-1">{t("subtype")}:</div>
+            </Col>
+            <Col span={12}>
+              <Checkbox checked={data.subtype} onChange={toggleSubtype} />
+            </Col>
+          </Row>
+
+          {data.subtype && (
+            <Row gutter={6} className="my-3">
+              <div className="font-semibold my-1">
+                {t("subtype_restriction")}:
+              </div>
+              <Select
+                optionList={Object.values(SubtypeRestriction).map((v) => ({
+                  label: t(v),
+                  value: v,
+                }))}
+                value={data.subtype_restriction}
+                className="w-full"
+                onChange={changeSubtypeRestriction}
+              />
+            </Row>
+          )}
         </>
       )}
       <Row gutter={6} className="my-3">

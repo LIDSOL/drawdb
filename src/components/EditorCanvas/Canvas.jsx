@@ -749,6 +749,8 @@ export default function Canvas() {
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
+      subtype: false,
+      subtype_restriction: "",
     };
 
     delete newRelationship.startX;
