@@ -99,13 +99,7 @@ function Relationship({ relationship, tables }) {
     setRefAquired(true);
   }, []);
 
-  if (refAquired) {
-    const pathLength = pathRef.current.getTotalLength();
-    const point1 = pathRef.current.getPointAtLength(length);
-    start = { x: point1.x, y: point1.y };
-    const point2 = pathRef.current.getPointAtLength(pathLength - length);
-    end = { x: point2.x, y: point2.y };
-  }
+
 
   return (
     <g className="select-none">
