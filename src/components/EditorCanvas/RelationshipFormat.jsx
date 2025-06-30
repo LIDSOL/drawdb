@@ -1,23 +1,19 @@
-export function CrowParentLines(
-  cardinalityStartX,
-  cardinalityStartY,
-  direction,
-) {
+export function CrowParentLines(cardinalityStartX, cardinalityStartY, direction) {
   return (
     <>
       <line
-        x1={cardinalityStartX - (10 * direction)}
+        x1={cardinalityStartX - 10 * direction}
         y1={cardinalityStartY + 10}
-        x2={cardinalityStartX - (10 * direction)}
+        x2={cardinalityStartX - 10 * direction}
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
         className="group-hover:fill-sky-700"
       />
       <line
-        x1={cardinalityStartX - (5 * direction)}
+        x1={cardinalityStartX - 5 * direction}
         y1={cardinalityStartY + 10}
-        x2={cardinalityStartX - (5 * direction)}
+        x2={cardinalityStartX - 5 * direction}
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
@@ -27,18 +23,14 @@ export function CrowParentLines(
   );
 }
 
-export function CrowParentDiamond(
-  cardinalityStartX,
-  cardinalityStartY,
-  direction,
-) {
+export function CrowParentDiamond(cardinalityStartX, cardinalityStartY, direction) {
   return (
     <polygon
       points={`
-        ${cardinalityStartX - (5 * direction)},${cardinalityStartY}
-        ${cardinalityStartX - (10 * direction)},${cardinalityStartY - 5}
-        ${cardinalityStartX - (15 * direction)},${cardinalityStartY}
-        ${cardinalityStartX - (10 * direction)},${cardinalityStartY + 5}
+        ${cardinalityStartX - 5 * direction},${cardinalityStartY}
+        ${cardinalityStartX - 10 * direction},${cardinalityStartY - 5}
+        ${cardinalityStartX - 15 * direction},${cardinalityStartY}
+        ${cardinalityStartX - 10 * direction},${cardinalityStartY + 5}
       `}
       stroke="gray"
       strokeWidth="2"
@@ -59,74 +51,33 @@ export function CrowsFootChild(
   cardinalityEnd,
   showCardinality
 ) {
-  const isMandatory = cardinalityEnd.startsWith("(1"); // (1,1) o (1,*)
-  const isOptional = cardinalityEnd.startsWith("(0");  // (0,1) o (0,*)
-  const isMany = cardinalityEnd.endsWith("*)");         // (1,*) o (0,*)
-  const isOne = cardinalityEnd.endsWith("1)");          // (1,1) o (0,1)
+  const isMandatory = cardinalityEnd.startsWith("(1");
+  const isOptional = cardinalityEnd.startsWith("(0");
+  const isMany = cardinalityEnd.endsWith("*)");
+  const isOne = cardinalityEnd.endsWith("1)");
   return (
     pathRef && (
       <>
         {isMany && (
           <>
-            <line
-              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY - 7}
-              stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
-            />
-            <line
-              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY + 7}
-              stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
-            />
-            <line
-              x1={cardinalityEndX + (5 * direction)} y1={cardinalityEndY}
-              x2={cardinalityEndX+(20*direction)} y2={cardinalityEndY}
-              stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
-            />
+            <line x1={cardinalityEndX + 5 * direction} y1={cardinalityEndY} x2={cardinalityEndX + 20 * direction} y2={cardinalityEndY - 7} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
+            <line x1={cardinalityEndX + 5 * direction} y1={cardinalityEndY} x2={cardinalityEndX + 20 * direction} y2={cardinalityEndY + 7} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
+            <line x1={cardinalityEndX + 5 * direction} y1={cardinalityEndY} x2={cardinalityEndX + 20 * direction} y2={cardinalityEndY} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
           </>
         )}
         {isOne && (
-          <line
-            x1={cardinalityEndX + (7 * direction)} y1={cardinalityEndY + 10}
-            x2={cardinalityEndX + (7 * direction)} y2={cardinalityEndY - 10}
-            stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
-          />
+          <line x1={cardinalityEndX + 7 * direction} y1={cardinalityEndY + 10} x2={cardinalityEndX + 7 * direction} y2={cardinalityEndY - 10} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
         )}
         {isOptional && (
-          <circle
-            cx={cardinalityEndX + (3 * direction)} cy={cardinalityEndY}
-            r="4" stroke="gray" strokeWidth="2" fill="white"
-            className="group-hover:stroke-sky-700"
-          />
+          <circle cx={cardinalityEndX + 3 * direction} cy={cardinalityEndY} r="4" stroke="gray" strokeWidth="2" fill="white" className="group-hover:stroke-sky-700" />
         )}
         {isMandatory && (
-          <line
-            x1={cardinalityEndX + (2 * direction)} y1={cardinalityEndY + 10}
-            x2={cardinalityEndX + (2 * direction)} y2={cardinalityEndY - 10}
-            stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700"
-          />
+          <line x1={cardinalityEndX + 2 * direction} y1={cardinalityEndY + 10} x2={cardinalityEndX + 2 * direction} y2={cardinalityEndY - 10} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
         )}
         {showCardinality && (
           <>
-            <text
-              x={cardinalityStartX - 8}
-              y={cardinalityStartY - 20}
-              fill="gray" strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityStart}
-            </text>
-            <text
-              x={cardinalityEndX - 8}
-              y={cardinalityEndY - 20}
-              fill="gray"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityEnd}
-            </text>
+            <text x={cardinalityStartX - 8} y={cardinalityStartY - 20} fill="gray" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityStart}</text>
+            <text x={cardinalityEndX - 8} y={cardinalityEndY - 20} fill="gray" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
           </>
         )}
       </>
@@ -144,46 +95,16 @@ export function DefaultNotation(
   cardinalityStart,
   cardinalityEnd
 ) {
-  return(
-      pathRef && (
-        <>
-            <circle
-              cx={cardinalityStartX}
-              cy={cardinalityStartY}
-              r="12"
-              fill="grey"
-              className="group-hover:fill-sky-700"
-            />
-            <text
-              x={cardinalityStartX}
-              y={cardinalityStartY}
-              fill="white"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityStart}
-            </text>
-            <circle
-              cx={cardinalityEndX}
-              cy={cardinalityEndY}
-              r="12"
-              fill="grey"
-              className="group-hover:fill-sky-700"
-            />
-            <text
-              x={cardinalityEndX}
-              y={cardinalityEndY}
-              fill="white"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityEnd}
-            </text>
-          </>
-      )
-  )
+  return (
+    pathRef && (
+      <>
+        <circle cx={cardinalityStartX} cy={cardinalityStartY} r="12" fill="grey" className="group-hover:fill-sky-700" />
+        <text x={cardinalityStartX} y={cardinalityStartY} fill="white" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityStart}</text>
+        <circle cx={cardinalityEndX} cy={cardinalityEndY} r="12" fill="grey" className="group-hover:fill-sky-700" />
+        <text x={cardinalityEndX} y={cardinalityEndY} fill="white" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
+      </>
+    )
+  );
 }
 
 export function IDEFZM(
@@ -213,54 +134,110 @@ export function IDEFZM(
   return (
     pathRef && (
       <>
-        <circle
-          cx={cardinalityEndX - (5 * direction)}
-          cy={cardinalityEndY}
-          r="4"
-          stroke="gray"
-          strokeWidth="1"
-          fill="gray"
-          className="group-hover:fill-sky-700 group-hover:stroke-sky-700"
-        />
+        <circle cx={cardinalityEndX - 5 * direction} cy={cardinalityEndY} r="4" stroke="gray" strokeWidth="1" fill="gray" className="group-hover:fill-sky-700 group-hover:stroke-sky-700" />
         {letter && (
-          <text
-            x={cardinalityEndX - (14 * direction)}
-            y={cardinalityEndY + 14}
-            fill="gray"
-            fontSize="14"
-            fontWeight="bold"
-            textAnchor="middle"
-            alignmentBaseline="middle"
-            className="group-hover:fill-sky-700"
-          >
-            {letter}
-          </text>
+          <text x={cardinalityEndX - 14 * direction} y={cardinalityEndY + 14} fill="gray" fontSize="14" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle" className="group-hover:fill-sky-700">{letter}</text>
         )}
         {showCardinality && (
           <>
-            <text
-              x={cardinalityStartX - 8}
-              y={cardinalityStartY - 20}
-              fill="gray"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityStart}
-            </text>
-            <text
-              x={cardinalityEndX - 8}
-              y={cardinalityEndY - 20}
-              fill="gray"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityEnd}
-            </text>
+            <text x={cardinalityStartX - 8} y={cardinalityStartY - 20} fill="gray" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityStart}</text>
+            <text x={cardinalityEndX - 8} y={cardinalityEndY - 20} fill="gray" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
           </>
         )}
       </>
+    )
+  );
+}
+
+export function subDT(point, angle, notation, subtypevar, direction, cardinalityStart, cardinalityEnd, onConnectSubtypePoint, relationshipId) {
+  return (
+    point && subtypevar === "1" && (
+      <g transform={`rotate(${angle + 180}, ${point.x}, ${point.y})`}>
+        <circle cx={point.x} cy={point.y} r="8" stroke="gray" strokeWidth="2" fill="white" className="group-hover:fill-sky-700" />
+        <text x={point.x} y={point.y + 2} fill="gray" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">D</text>
+        <line x1={point.x - 10} y1={point.y - 20} x2={point.x - 10} y2={point.y + 20} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
+        <line x1={point.x - 20} y1={point.y - 20} x2={point.x - 20} y2={point.y + 20} stroke="gray" strokeWidth="2" className="group-hover:stroke-sky-700" />
+        <circle
+          cx={point.x}
+          cy={point.y + 20}
+          r={6}
+          fill="skyblue"
+          stroke="gray"
+          strokeWidth="1"
+          cursor="crosshair"
+          onPointerDown={(e) => onConnectSubtypePoint?.(e, point.x, point.y + 20, relationshipId)}
+        />
+      </g>
+    )
+  );
+}
+
+export function subDP(point, angle, notation, subtypevar, direction, cardinalityStart, cardinalityEnd, onConnectSubtypePoint, relationshipId) {
+  return (
+    point && subtypevar === "2" && (
+      <g transform={`rotate(${angle + 180}, ${point.x}, ${point.y})`}>
+        <circle cx={point.x} cy={point.y} r="8" stroke="gray" strokeWidth='2' fill="white" className="group-hover:fill-sky-700" />
+        <text x={point.x} y={point.y + 2} fill="grey" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">D</text>
+        <line x1={point.x - 10} y1={point.y + 20} x2={point.x - 10} y2={point.y - 20} stroke="gray" strokeWidth='2' className="group-hover:fill-sky-700" />
+        <text x={point.x + 10} y={point.y - 10} fill="black" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
+        <circle
+          cx={point.x}
+          cy={point.y + 20}
+          r={6}
+          fill="skyblue"
+          stroke="gray"
+          strokeWidth="1"
+          cursor="crosshair"
+          onPointerDown={(e) => onConnectSubtypePoint?.(e, point.x, point.y + 20, relationshipId)}
+        />
+      </g>
+    )
+  );
+}
+
+export function subOT(point, angle, notation, subtypevar, direction, cardinalityStart, cardinalityEnd, onConnectSubtypePoint, relationshipId) {
+  return (
+    point && subtypevar === "3" && (
+      <g transform={`rotate(${angle + 180}, ${point.x}, ${point.y})`}>
+        <circle cx={point.x} cy={point.y} r="8" stroke="gray" strokeWidth='2' fill="white" className="group-hover:fill-sky-700" />
+        <text x={point.x} y={point.y + 2} fill="grey" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">O</text>
+        <line x1={point.x - 10} y1={point.y + 20} x2={point.x - 10} y2={point.y - 20} stroke="gray" strokeWidth='2' className="group-hover:fill-sky-700" />
+        <line x1={point.x - 20} y1={point.y + 20} x2={point.x - 20} y2={point.y - 20} stroke="gray" strokeWidth='2' className="group-hover:fill-sky-700" />
+        <text x={point.x + 10} y={point.y - 10} fill="black" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
+        <circle
+          cx={point.x}
+          cy={point.y + 20}
+          r={6}
+          fill="skyblue"
+          stroke="gray"
+          strokeWidth="1"
+          cursor="crosshair"
+          onPointerDown={(e) => onConnectSubtypePoint?.(e, point.x, point.y + 20, relationshipId)}
+        />
+      </g>
+    )
+  );
+}
+
+export function subOP(point, angle, notation, subtypevar, direction, cardinalityStart, cardinalityEnd, onConnectSubtypePoint, relationshipId) {
+  return (
+    point && subtypevar === "4" && (
+      <g transform={`rotate(${angle + 180}, ${point.x}, ${point.y})`}>
+        <circle cx={point.x} cy={point.y} r="8" stroke="gray" strokeWidth='2' fill="white" className="group-hover:fill-sky-700" />
+        <text x={point.x} y={point.y + 2} fill="grey" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">O</text>
+        <line x1={point.x - 10} y1={point.y + 20} x2={point.x - 10} y2={point.y - 20} stroke="gray" strokeWidth='2' className="group-hover:fill-sky-700" />
+        <text x={point.x + 10} y={point.y - 10} fill="black" strokeWidth="0.5" textAnchor="middle" alignmentBaseline="middle">{cardinalityEnd}</text>
+        <circle
+          cx={point.x}
+          cy={point.y + 20}
+          r={6}
+          fill="skyblue"
+          stroke="gray"
+          strokeWidth="1"
+          cursor="crosshair"
+          onPointerDown={(e) => onConnectSubtypePoint?.(e, point.x, point.y + 20, relationshipId)}
+        />
+      </g>
     )
   );
 }

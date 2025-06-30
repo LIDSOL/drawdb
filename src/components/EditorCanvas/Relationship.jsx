@@ -10,6 +10,7 @@ import {
   tableFieldHeight,
   tableHeaderHeight,
   tableColorStripHeight,
+  SubtypeRestriction,
 } from "../../data/constants";
 import { calcPath } from "../../utils/calcPath";
 import { useDiagram, useSettings, useLayout, useSelect } from "../../hooks";
@@ -21,7 +22,11 @@ import {
   CrowParentDiamond,
   CrowsFootChild,
   IDEFZM,
-  DefaultNotation
+  DefaultNotation,
+  subDP,
+  subDT,
+  subOP,
+  subOT
 } from "./RelationshipFormat";
 
 const labelFontSize = 16;
@@ -40,6 +45,28 @@ export default function Relationship({ data }) {
 
   const [breakpoints, setBreakpoints] = useState(data.breakpoints ?? []);
   const [draggingBpIndex, setDraggingBpIndex] = useState(null);
+
+  let subtypevar = "0";
+  const getSubtypeFormat = () => {
+    if (!data.subtype) return null;
+    switch (data.subtype_restriction) {
+      case SubtypeRestriction.DISJOINT_TOTAL:
+        subtypevar = "1";
+        return subDT;
+      case SubtypeRestriction.DISJOINT_PARTIAL:
+        subtypevar = "2";
+        return subDP;
+      case SubtypeRestriction.OVERLAPPING_TOTAL:
+        subtypevar = "3";
+        return subOT;
+      case SubtypeRestriction.OVERLAPPING_PARTIAL:
+        subtypevar = "4";
+        return subOP;
+      default:
+        return null;
+    }
+  };
+  const subtypeFormat = getSubtypeFormat();
 
   const startTable = tables[data.startTableId];
   const endTable = tables[data.endTableId];
@@ -92,9 +119,9 @@ export default function Relationship({ data }) {
   const relationshipType = determinedRelationshipType ?? data.lineType ?? "0";
 
   const getForeignKeyFields = () => {
-    if(!endTable || !endTable.fields) return [];
+    if (!endTable || !endTable.fields) return [];
 
-    if(Array.isArray(data.endFieldId)){
+    if (Array.isArray(data.endFieldId)) {
       return endTable.fields.filter(f => data.endFieldId.includes(f.id));
     } else if (data.endFieldId !== undefined) {
       return endTable.fields.filter(f => f.id === data.endFieldId);
@@ -155,33 +182,36 @@ export default function Relationship({ data }) {
   const currentNotation = formats.notation[effectiveNotationKey];
 
   let parentFormat = null;
-  if (settings.notation === Notation.CROWS_FOOT) {
-    if (cardinalityStart === "(1,1)") {
-      parentFormat = currentNotation.parent_lines;
-    } else if (cardinalityStart === "(0,1)") {
-      parentFormat = currentNotation.parent_diamond;
-    }
-  } else if (settings.notation === Notation.IDEF1X) {
-    if (cardinalityStart === "(0,1)") {
-      parentFormat = currentNotation.parent_diamond;
+  if (!data.subtype) {
+    if (settings.notation === Notation.CROWS_FOOT) {
+      if (cardinalityStart === "(1,1)") {
+        parentFormat = currentNotation.parent_lines;
+      } else if (cardinalityStart === "(0,1)") {
+        parentFormat = currentNotation.parent_diamond;
+      }
+    } else if (settings.notation === Notation.IDEF1X) {
+      if (cardinalityStart === "(0,1)") {
+        parentFormat = currentNotation.parent_diamond;
+      }
     }
   }
 
   let childFormat;
-  if (settings.notation === Notation.CROWS_FOOT) {
-    childFormat = currentNotation.child;
-  } else if (settings.notation === Notation.IDEF1X) {
-    if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
-      childFormat = currentNotation.one_to_one;
-    } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
-      childFormat = currentNotation.one_to_many;
-    }
-  } else {
-    if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
-      childFormat = currentNotation.one_to_one;
-    }
-    else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
-      childFormat = currentNotation.one_to_many;
+  if (!data.subtype) {
+    if (settings.notation === Notation.CROWS_FOOT) {
+      childFormat = currentNotation.child;
+    } else if (settings.notation === Notation.IDEF1X) {
+      if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+        childFormat = currentNotation.one_to_one;
+      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+        childFormat = currentNotation.one_to_many;
+      }
+    } else {
+      if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
+        childFormat = currentNotation.one_to_one;
+      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+        childFormat = currentNotation.one_to_many;
+      }
     }
   }
 
@@ -243,11 +273,19 @@ export default function Relationship({ data }) {
   let labelHeight = labelRef.current?.getBBox().height ?? 0;
 
   const cardinalityOffset = 28;
+  let angle = 0;
+  let subtypePoint = null;
 
   if (pathRef.current && path) {
     const pathLength = pathRef.current.getTotalLength() - cardinalityOffset;
 
     const labelPoint = pathRef.current.getPointAtLength(pathLength / 2);
+    subtypePoint = pathRef.current.getPointAtLength(pathLength * 0.33);
+    const subtypeTangentPoint = pathRef.current.getPointAtLength(pathLength * 0.33 + 1);
+    const dx = subtypeTangentPoint.x - subtypePoint.x;
+    const dy = subtypeTangentPoint.y - subtypePoint.y;
+    angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
     labelX = labelPoint.x - (labelWidth ?? 0) / 2;
     labelY = labelPoint.y + (labelHeight ?? 0) / 2;
 
@@ -257,7 +295,7 @@ export default function Relationship({ data }) {
 
     const point2 = pathRef.current.getPointAtLength(pathLength);
     cardinalityEndX = endAttach.x;
-    cardinalityEndY = endAttach.y; 
+    cardinalityEndY = endAttach.y;
   }
 
   const edit = () => {
@@ -350,6 +388,16 @@ export default function Relationship({ data }) {
           cardinalityStart,
           cardinalityEnd,
           settings.showCardinality
+        )}
+
+        {subtypeFormat && subtypeFormat(
+          subtypePoint,
+          angle,
+          settings.notation,
+          subtypevar,
+          direction,
+          cardinalityStart,
+          cardinalityEnd
         )}
 
         {settings.showRelationshipLabels && (
