@@ -1,7 +1,8 @@
 import { useRef, useState,useEffect } from "react";
 import {
   Action,
-  Cardinality,
+  RelationshipType,
+  RelationshipCardinalities,
   Constraint,
   darkBgTheme,
   ObjectType,
@@ -758,10 +759,13 @@ export default function Canvas() {
       startFieldId: linkingLine.startFieldId,
       endTableId: hoveredTable.tableId,
       endFieldId: newFields.length > 0 ? newFields[0].id : undefined,
-      Cardinality: Cardinality.ONE_TO_ONE, // Default, can be changed by editing the relationship
+      relationshipType: RelationshipType.ONE_TO_ONE, // Default, can be changed by editing the relationship
+      cardinality: RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
+      subtype: false,
+      subtype_restriction: "",
     };
 
     delete newRelationship.startX;

@@ -6,6 +6,7 @@ import {
   Popover,
   Table,
   Input,
+  Checkbox,
 } from "@douyinfe/semi-ui";
 import {
   IconDeleteStroked,
@@ -13,16 +14,19 @@ import {
   IconMore,
 } from "@douyinfe/semi-icons";
 import {
-  Cardinality,
+  RelationshipType,
+  RelationshipCardinalities,
   Constraint,
+  SubtypeRestriction,
   Action,
   ObjectType,
+  Notation,
 } from "../../../data/constants";
 import { useDiagram, useUndoRedo} from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-
+import { useSettings } from "../../../hooks";
 const columns = [
   {
     title: i18n.t("primary"),
@@ -36,10 +40,11 @@ const columns = [
 
 export default function RelationshipInfo({ data }) {
   const { setUndoStack, setRedoStack } = useUndoRedo();
-  const { tables, setRelationships, deleteRelationship, updateRelationship } =
+  const { tables, setTables, setRelationships, deleteRelationship, updateRelationship } =
     useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
+  const { settings } = useSettings();
 
   const swapKeys = () => {
     setUndoStack((prev) => [
@@ -85,6 +90,42 @@ export default function RelationshipInfo({ data }) {
     );
   };
 
+  const changeRelationshipType = (value) => {
+    const defaultCardinality =
+      RelationshipCardinalities[value] && RelationshipCardinalities[value][0]
+        ? RelationshipCardinalities[value][0].label
+        : "";
+
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: data.id,
+        undo: {
+          relationshipType: data.relationshipType,
+          cardinality: data.cardinality,
+        },
+        redo: {
+          relationshipType: value,
+          cardinality: defaultCardinality,
+        },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[relationship type]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id
+          ? { ...e, relationshipType: value, cardinality: defaultCardinality }
+          : e,
+      ),
+    );
+  };
+
   const changeCardinality = (value) => {
     setUndoStack((prev) => [
       ...prev,
@@ -108,6 +149,54 @@ export default function RelationshipInfo({ data }) {
     );
   };
 
+  const changeSubtypeRestriction = (value) => {
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: data.id,
+        undo: { subtype_restriction: data.subtype_restriction },
+        redo: { subtype_restriction: value },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[subtype_restriction]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, subtype_restriction: value } : e,
+      ),
+    );
+  }
+
+  const toggleSubtype = () => {
+    const prevVal = data.subtype;
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: data.id,
+        undo: { subtype: data.subtype },
+        redo: { subtype: !data.subtype },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[subtype]",
+        }),
+      },
+    ]);
+
+    setRedoStack([]);
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, subtype: !prevVal } : e,
+      ),
+    );
+  };
+
   const changeConstraint = (key, value) => {
     const undoKey = `${key}Constraint`;
     setUndoStack((prev) => [
@@ -127,6 +216,57 @@ export default function RelationshipInfo({ data }) {
     setRedoStack([]);
     setRelationships((prev) =>
       prev.map((e, idx) => (idx === data.id ? { ...e, [undoKey]: value } : e)),
+    );
+  };
+
+  const toggleParentCardinality = () => {
+    const startTable = tables.find((t) => t.id === data.endTableId);
+    if (!startTable) return;
+
+    const fkFieldIds = Array.isArray(data.endFieldId)
+      ? data.endFieldId
+      : [data.endFieldId];
+
+    const fkFields = startTable.fields.filter((f) => fkFieldIds.includes(f.id));
+    if (fkFields.length === 0) return;
+
+    const isCurrentlyNullable = fkFields.every((field) => !field.notNull);
+    const newNotNullValue = isCurrentlyNullable;
+
+    const undoFields = fkFields.map(field => ({ id: field.id, notNull: field.notNull }));
+    const redoFields = fkFields.map(field => ({ id: field.id, notNull: newNotNullValue }));
+
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.TABLE,
+        tid: startTable.id,
+        undo: { fields: undoFields },
+        redo: { fields: redoFields },
+        message: t("edit_relationship", {
+          refName: data.name,
+          extra: "[parent cardinality]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+
+    setTables((prevTables) =>
+      prevTables.map((table) => {
+        if (table.id === startTable.id) {
+          return {
+            ...table,
+            fields: table.fields.map((field) => {
+              if (fkFieldIds.includes(field.id)) {
+                return { ...field, notNull: newNotNullValue };
+              }
+              return field;
+            }),
+          };
+        }
+        return table;
+      }),
     );
   };
 
@@ -212,16 +352,73 @@ export default function RelationshipInfo({ data }) {
           </Popover>
         </div>
       </div>
-      <div className="font-semibold my-1">{t("cardinality")}:</div>
+      <div className="font-semibold my-1">{t("relationship_type")}:</div>
       <Select
-        optionList={Object.values(Cardinality).map((v) => ({
+        optionList={Object.values(RelationshipType).map((v) => ({
           label: t(v),
           value: v,
         }))}
-        value={data.cardinality}
+        value={data.relationshipType}
         className="w-full"
-        onChange={changeCardinality}
+        onChange={changeRelationshipType}
       />
+      {settings.notation !== "default" && (
+        <>
+          <div className="font-semibold my-1">{t("cardinality")}:</div>
+          <div className="flex items-center w-full gap-2">
+            <Select
+              optionList={
+                RelationshipCardinalities[data.relationshipType] &&
+                RelationshipCardinalities[data.relationshipType].map((c) => ({
+                  label: c.label,
+                  value: c.label,
+                }))
+              }
+              value={data.cardinality}
+              className="w-full"
+              onChange={changeCardinality}
+              disabled={!data.relationshipType}
+              placeholder={t("select_cardinality")}
+            />
+            {(settings.notation === Notation.CROWS_FOOT ||
+              settings.notation === Notation.IDEF1X) && (
+              <Button
+                icon={<IconLoopTextStroked />}
+                type="tertiary"
+                onClick={toggleParentCardinality}
+                aria-label="Toggle Parent Cardinality"
+              />
+            )}
+          </div>
+
+          {/* 👇 Aquí ya es otra fila separada */}
+          <Row gutter={6} className="my-3">
+            <Col span={12}>
+              <div className="font-semibold my-1">{t("subtype")}:</div>
+            </Col>
+            <Col span={12}>
+              <Checkbox checked={data.subtype} onChange={toggleSubtype} />
+            </Col>
+          </Row>
+
+          {data.subtype && (
+            <Row gutter={6} className="my-3">
+              <div className="font-semibold my-1">
+                {t("subtype_restriction")}:
+              </div>
+              <Select
+                optionList={Object.values(SubtypeRestriction).map((v) => ({
+                  label: t(v),
+                  value: v,
+                }))}
+                value={data.subtype_restriction}
+                className="w-full"
+                onChange={changeSubtypeRestriction}
+              />
+            </Row>
+          )}
+        </>
+      )}
       <Row gutter={6} className="my-3">
         <Col span={12}>
           <div className="font-semibold">{t("on_update")}: </div>

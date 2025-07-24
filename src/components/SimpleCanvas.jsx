@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import {
-  Cardinality,
+  RelationshipType,
   tableColorStripHeight,
   tableFieldHeight,
   tableHeaderHeight,
@@ -84,21 +84,12 @@ function Relationship({ relationship, tables }) {
   let cardinalityStart = "1";
   let cardinalityEnd = "1";
 
-  switch (relationship.cardinality) {
-    case Cardinality.MANY_TO_ONE:
-      cardinalityStart = "n";
-      cardinalityEnd = "1";
-      break;
-    case Cardinality.ONE_TO_MANY:
-      cardinalityStart = "1";
-      cardinalityEnd = "n";
-      break;
-    case Cardinality.ONE_TO_ONE:
-      cardinalityStart = "1";
-      cardinalityEnd = "1";
-      break;
-    default:
-      break;
+  if (relationship.relationshipType === RelationshipType.ONE_TO_MANY) {
+    cardinalityStart = "1";
+    cardinalityEnd = relationship.cardinality || "(1,*)";
+  } else if (relationship.relationshipType === RelationshipType.ONE_TO_ONE) {
+    cardinalityStart = "1";
+    cardinalityEnd = relationship.cardinality || "(1,1)";
   }
 
   const length = 32;
@@ -108,13 +99,7 @@ function Relationship({ relationship, tables }) {
     setRefAquired(true);
   }, []);
 
-  if (refAquired) {
-    const pathLength = pathRef.current.getTotalLength();
-    const point1 = pathRef.current.getPointAtLength(length);
-    start = { x: point1.x, y: point1.y };
-    const point2 = pathRef.current.getPointAtLength(pathLength - length);
-    end = { x: point2.x, y: point2.y };
-  }
+
 
   return (
     <g className="select-none">
