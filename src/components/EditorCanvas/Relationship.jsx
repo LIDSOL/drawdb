@@ -4,12 +4,8 @@ import {
   RelationshipCardinalities,
   ParentCardinality,
   darkBgTheme,
-  Notation,
   ObjectType,
   Tab,
-  tableFieldHeight,
-  tableHeaderHeight,
-  tableColorStripHeight,
 } from "../../data/constants";
 import { calcPath } from "../../utils/calcPath";
 import { useDiagram, useSettings, useLayout, useSelect } from "../../hooks";
@@ -23,6 +19,7 @@ import {
   IDEFZM,
   DefaultNotation
 } from "./RelationshipFormat";
+
 
 const labelFontSize = 16;
 
@@ -215,9 +212,8 @@ export default function Relationship({ data }) {
 
   const cardinalityOffset = 28;
 
-
   if (pathRef.current) {
-    const pathLength = pathRef.current.getTotalLength() - cardinalityOffset;
+    const pathLength = pathRef.current.getTotalLength();
 
     const labelPoint = pathRef.current.getPointAtLength(pathLength / 2);
     labelX = labelPoint.x - (labelWidth ?? 0) / 2;
@@ -226,9 +222,8 @@ export default function Relationship({ data }) {
     const point1 = pathRef.current.getPointAtLength(cardinalityOffset);
     cardinalityStartX = point1.x;
     cardinalityStartY = point1.y;
-
     const point2 = pathRef.current.getPointAtLength(
-      pathLength,
+      pathLength - cardinalityOffset,
     );
     cardinalityEndX = point2.x;
     cardinalityEndY = point2.y;
@@ -257,49 +252,30 @@ export default function Relationship({ data }) {
     }
   };
 
-  if ((settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && cardinalityEndX < cardinalityStartX){
-    direction = -1;
-  }
-
-  const pathData = {
-    ...data,
-    startTable: {
-      x: startTable ? startTable.x : 0,
-      y: startTable ? startTable.y + startFieldYOffset : 0,
-    },
-    endTable: {
-      x: endTable ? endTable.x : 0,
-      y: endTable ? endTable.y + endFieldYOffset : 0,
-    },
-  };
-
   return (
     <>
       <g className="select-none group" onDoubleClick={edit}>
-        {/* Invisible path for larger hit area */}
-        <path
-          d={calcPath(
-            pathData,
-            settings.tableWidth,
-          )}
-          stroke="transparent"
-          fill="none"
-          strokeWidth={15}
-          strokeDasharray={"0"}
-          cursor="pointer"
-        />
-        {/* Visible path */}
         <path
           ref={pathRef}
           d={calcPath(
-            pathData,
+            {
+              ...data,
+              startTable: {
+                x: tables[data.startTableId].x,
+                y: tables[data.startTableId].y,
+              },
+              endTable: {
+                x: tables[data.endTableId].x,
+                y: tables[data.endTableId].y,
+              },
+            },
             settings.tableWidth,
           )}
           stroke="gray"
           className="group-hover:stroke-sky-700"
           fill="none"
-          strokeDasharray={relationshipType}
           strokeWidth={2}
+          cursor="pointer"
         />
         {parentFormat && parentFormat(
           cardinalityStartX,
@@ -327,7 +303,6 @@ export default function Relationship({ data }) {
           cardinalityEnd,
           settings.showCardinality
         )}
-
         {settings.showRelationshipLabels && (
           <>
             <rect
@@ -350,8 +325,45 @@ export default function Relationship({ data }) {
             </text>
           </>
         )}
+        {pathRef.current && settings.showCardinality && (
+          <>
+            <circle
+              cx={cardinalityStartX}
+              cy={cardinalityStartY}
+              r="12"
+              fill="grey"
+              className="group-hover:fill-sky-700"
+            />
+            <text
+              x={cardinalityStartX}
+              y={cardinalityStartY}
+              fill="white"
+              strokeWidth="0.5"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {cardinalityStart}
+            </text>
+            <circle
+              cx={cardinalityEndX}
+              cy={cardinalityEndY}
+              r="12"
+              fill="grey"
+              className="group-hover:fill-sky-700"
+            />
+            <text
+              x={cardinalityEndX}
+              y={cardinalityEndY}
+              fill="white"
+              strokeWidth="0.5"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {cardinalityEnd}
+            </text>
+          </>
+        )}
       </g>
-
       <SideSheet
         title={t("edit")}
         size="small"

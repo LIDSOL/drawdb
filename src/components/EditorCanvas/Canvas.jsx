@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState,useEffect } from "react";
 import {
   Action,
   RelationshipType,
@@ -26,9 +26,24 @@ import {
 import { useTranslation } from "react-i18next";
 import { useEventListener } from "usehooks-ts";
 import { areFieldsCompatible } from "../../utils/utils";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function Canvas() {
   const { t } = useTranslation();
+  const { transform, setTransform } = useTransform();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const focusPosition = location.state?.focusPosition;
+    if (focusPosition) {
+      setTransform((prev) => ({
+        ...prev,
+        pan: focusPosition,
+      }));
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate, setTransform]);
 
   const [isAreaSelecting, setIsAreaSelecting] = useState(false);
   const [selectionArea, setSelectionArea] = useState({
@@ -59,7 +74,7 @@ export default function Canvas() {
   const { layout } = useLayout();
   const { settings } = useSettings();
   const { setUndoStack, setRedoStack } = useUndoRedo();
-  const { transform, setTransform } = useTransform();
+
   const { selectedElement, setSelectedElement } = useSelect();
   const [dragging, setDragging] = useState({
     element: ObjectType.NONE,
@@ -636,7 +651,7 @@ export default function Canvas() {
     });
   };
 
-  const handleGripField = (field, fieldTableid) => {
+  const handleGripField = (field) => {
       // A field can be a foreign key only if it's a primary key or both NOT NULL and UNIQUE.
       // If it can't be selected, show an error message and exit.
       if (!field.primary && !(field.notNull && field.unique)) {
@@ -647,14 +662,10 @@ export default function Canvas() {
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setLinkingLine({
       ...linkingLine,
-      startTableId: fieldTableid,
+      startTableId: field.tableId,
       startFieldId: field.id,
       startX: pointer.spaces.diagram.x,
       startY: pointer.spaces.diagram.y,
-      endX: pointer.spaces.diagram.x,
-      endY: pointer.spaces.diagram.y,
-      endTableId: -1,
-      endFieldId: -1,
     });
     setLinking(true);
   };
@@ -664,22 +675,10 @@ export default function Canvas() {
     // Get the childTable and parentTable
     const childTable = tables.find((t) => t.id === hoveredTable.tableId);
     const parentTable = tables.find((t) => t.id === linkingLine.startTableId);
-
-    if (!parentTable) {
-      console.error("Parent table not found for linking.");
-      setLinking(false);
-      return;
-    }
-    if (!childTable) {
-      console.error("Child table not found for linking.");
-      setLinking(false);
-      return;
-    }
     const parentFields = parentTable.fields.filter((field) => field.primary);
 
     if (parentFields.length === 0) {
       Toast.info(t("no_primary_key"));
-      setLinking(false);
       return;
     }
     // If the relationship is recursive
@@ -687,7 +686,6 @@ export default function Canvas() {
     if (!recursiveRelation) {
       if (!areFieldsCompatible(parentFields, childTable)) {
         Toast.info(t("duplicate_field_name"));
-        setLinking(false);
         return;
       }
     }
@@ -695,21 +693,13 @@ export default function Canvas() {
     const alreadyLinked = relationships.some(
       (rel) =>
         rel.startTableId === linkingLine.startTableId &&
-        rel.endTableId === hoveredTable.tableId &&
-        rel.startFieldId === linkingLine.startFieldId &&
-        rel.endFieldId === (parentFields.map(
-          (field, index) =>
-            childTable.fields.reduce(
-              (maxId, f) =>
-                Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index)[0])
+        rel.endTableId === hoveredTable.tableId
     );
     if (alreadyLinked) {
       Toast.info(t("duplicate_relationship"));
-      setLinking(false);
       return;
     }
-    // Save the ID of the child table before modifying its fields
-    const childTableIdForFks = childTable.id;
+  
     // Generate new fields for the childTable
     const newFields = parentFields.map((field, index) => ({
       name: recursiveRelation ? "" : field.name,
@@ -727,17 +717,15 @@ export default function Canvas() {
         tableId: parentTable.id,
         fieldId: field.id,
       },
-      id: childTable.fields.reduce((maxId, f) => Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index,
+      id: childTable.fields.length + index, // Ensure IDs are unique
     }));
     // Concatenate the existing fields with the new fields
     const updatedChildFields = [...childTable.fields, ...newFields];
     // Update the childTable with the new fields
-    updateTable(childTableIdForFks, {
+    updateTable(childTable.id, {
       fields: updatedChildFields,
     });
-    const actualStartFieldId = parentTable.fields.find(
-      (f) => f.id === linkingLine.startFieldId);
-    const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : 'table'}`;
+
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -748,7 +736,9 @@ export default function Canvas() {
       cardinality: RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
-      name: relationshipName,
+      name: `fk_${parentTable.name}_${parentFields[0].name}`,
+      id: relationships.length,
+      endField: newFields,
     };
 
     delete newRelationship.startX;
@@ -756,7 +746,7 @@ export default function Canvas() {
     delete newRelationship.endX;
     delete newRelationship.endY;
     // Add the new relationship to the relationships array
-    addRelationship(newRelationship, newFields, childTableIdForFks, true);
+    addRelationship(newRelationship);
     setLinking(false);
   };
 
@@ -766,7 +756,7 @@ export default function Canvas() {
     (e) => {
       e.preventDefault();
 
-      if (e.ctrlKey || e.metaKey) {
+      if (e.ctrlKey) {
         // How "eager" the viewport is to
         // center the cursor's coordinates
         const eagernessFactor = 0.05;

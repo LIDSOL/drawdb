@@ -8,7 +8,6 @@ const en = {
   translation: {
     report_bug: "Report a bug",
     import: "Import",
-    import_from: "Import from",
     file: "File",
     new: "New",
     new_window: "New window",
@@ -50,10 +49,6 @@ const en = {
     reset_view: "Reset view",
     show_grid: "Show grid",
     show_cardinality: "Show cardinality",
-    default_notation: "Default",
-    crows_foot_notation: "Crow's foot",
-    idef1x_notation: "IDEF1X",
-    notation: "Notation",
     theme: "Theme",
     light: "Light",
     dark: "Dark",
@@ -129,6 +124,16 @@ const en = {
     precision: "Precision",
     set_precision: "Set precision: 'size, digits'",
     use_for_batch_input: "Use , for batch input",
+    field_defaults: "Field defaults",
+    default_field_type: "Default field type",
+    uppercase_fields: "Uppercase fields",
+    default_not_null: "Default not null",
+    default_type_sizes: "Default type sizes",
+    default_size: "Default size",
+    default_precision: "Default precision",
+    default_scale: "Default scale",
+    no_configurable_types: "No configurable types for this database",
+    database: "database",
     indices: "Indices",
     add_index: "Add index",
     select_fields: "Select fields",
@@ -168,6 +173,7 @@ const en = {
     confirm: "Confirm",
     last_modified: "Last modified",
     drag_and_drop_files: "Drag and drop the file here or click to upload.",
+    support_json_and_ddb: "JSON and DDB files are supported",
     upload_sql_to_generate_diagrams:
       "Upload an sql file to autogenerate your tables and columns.",
     overwrite_existing_diagram: "Overwrite existing diagram",
@@ -254,8 +260,7 @@ const en = {
     share_info:
       "* Sharing this link will not create a live real-time collaboration session.",
     show_relationship_labels: "Show relationship labels",
-    docs: "Docs",
-    supported_types: "Supported file types:",
+    defaults: "Defaults",
   },
 };
 

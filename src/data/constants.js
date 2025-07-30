@@ -55,6 +55,7 @@ export const Notation = {
   CROWS_FOOT: "crows_foot",
   IDEF1X: "idef1x",
 }
+
 export const Constraint = {
   NONE: "No action",
   RESTRICT: "Restrict",
@@ -112,6 +113,7 @@ export const MODAL = {
   TABLE_WIDTH: 9,
   LANGUAGE: 10,
   SHARE: 11,
+  DEFAULTS: 12,
 };
 
 export const STATUS = {
@@ -135,9 +137,4 @@ export const DB = {
   MARIADB: "mariadb",
   ORACLE: "oracledb",
   GENERIC: "generic",
-};
-
-export const IMPORT_FROM = {
-  JSON: 0,
-  DBML: 1,
 };
