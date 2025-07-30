@@ -132,7 +132,7 @@ export default function Table(props) {
     const safetyBuffer = 25; // Extra buffer for aesthetics and measurement inaccuracies
     return Math.max(minTableWidth, Math.ceil(maxCalculatedWidth + safetyBuffer));
 
-  }, [tableData.name, tableData.fields, settings.notation, database, dbToTypes, settings.tableWidth]);
+  }, [tableData, settings.notation, database, dbToTypes, settings.tableWidth]);
 
   useEffect(() => {
     const currentWidth = tableData.width || settings.tableWidth;

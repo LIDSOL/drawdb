@@ -1,9 +1,7 @@
-import { tableFieldHeight, tableHeaderHeight } from "../data/constants";
-
 export function calcPath(r, startTableWidth = 200, endTableWidth = 200, zoom = 1) {
   const startWidth = startTableWidth * zoom;
   const endWidth = endTableWidth * zoom;
-  
+
   let x1 = r.startTable.x;
   let y1 = r.startTable.y;
   let x2 = r.endTable.x;
