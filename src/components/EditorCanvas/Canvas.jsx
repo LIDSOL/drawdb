@@ -10,6 +10,7 @@ import {
   tableFieldHeight,
   tableColorStripHeight,
   Notation,
+  Tab,
 } from "../../data/constants";
 import { Toast, Modal, Input } from "@douyinfe/semi-ui";
 import Table from "./Table";
@@ -18,6 +19,8 @@ import Relationship from "./Relationship";
 import Note from "./Note";
 import TableContextMenu from "./TableContextMenu";
 import RelationshipContextMenu from "./RelationshipContextMenu";
+import AreaContextMenu from "./AreaContextMenu";
+import NoteContextMenu from "./NoteContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -74,8 +77,8 @@ export default function Canvas() {
   } = canvasContextValue;
 
   const { tables, updateTable, relationships, addRelationship, deleteTable, addChildToSubtype, deleteRelationship, updateRelationship, setRelationships, setTables } = useDiagram();
-  const { areas, updateArea } = useAreas();
-  const { notes, updateNote } = useNotes();
+  const { areas, updateArea, deleteArea } = useAreas();
+  const { notes, updateNote, deleteNote } = useNotes();
   const { layout } = useLayout();
   const { settings } = useSettings();
   const { setRedoStack, pushUndo } = useUndoRedo();
@@ -151,6 +154,20 @@ export default function Canvas() {
     relationshipId: null,
   });
 
+  const [areaContextMenu, setAreaContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    areaId: null,
+  });
+
+  const [noteContextMenu, setNoteContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    noteId: null,
+  });
+
   const [renameModal, setRenameModal] = useState({
     visible: false,
     tableId: null,
@@ -161,6 +178,20 @@ export default function Canvas() {
   const [relationshipRenameModal, setRelationshipRenameModal] = useState({
     visible: false,
     relationshipId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [areaRenameModal, setAreaRenameModal] = useState({
+    visible: false,
+    areaId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [noteRenameModal, setNoteRenameModal] = useState({
+    visible: false,
+    noteId: null,
     currentName: "",
     newName: "",
   });
@@ -209,11 +240,27 @@ export default function Canvas() {
 
   const handleEditTable = () => {
     if (contextMenu.tableId !== null) {
-      setSelectedElement({
-        element: ObjectType.TABLE,
-        id: contextMenu.tableId,
-        open: true,
-      });
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          currentTab: Tab.TABLES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_table_${contextMenu.tableId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          open: true,
+        }));
+      }
     }
   };
 
@@ -330,11 +377,29 @@ export default function Canvas() {
 
   const handleEditRelationship = () => {
     if (relationshipContextMenu.relationshipId !== null) {
-      setSelectedElement({
-        element: ObjectType.RELATIONSHIP,
-        id: relationshipContextMenu.relationshipId,
-        open: true,
-      });
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.RELATIONSHIP,
+          id: relationshipContextMenu.relationshipId,
+          currentTab: Tab.RELATIONSHIPS,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(
+              `scroll_relationship_${relationshipContextMenu.relationshipId}`,
+            )
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.RELATIONSHIP,
+          id: relationshipContextMenu.relationshipId,
+          open: true,
+        }));
+      }
       handleRelationshipContextMenuClose();
     }
   };
@@ -594,6 +659,257 @@ export default function Canvas() {
     }
   };
 
+  // Area context menu handlers
+  const handleAreaContextMenu = (e, areaId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setAreaContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      areaId: areaId,
+    });
+  };
+
+  const handleAreaContextMenuClose = () => {
+    setAreaContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      areaId: null,
+    });
+  };
+
+  const handleEditArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          currentTab: Tab.AREAS,
+          open: true,
+        }));
+        // Scroll to the area after a brief delay to ensure the tab has switched
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_area_${areaContextMenu.areaId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleRenameArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      const area = areas.find((a) => a.id === areaContextMenu.areaId);
+      if (area) {
+        setAreaRenameModal({
+          visible: true,
+          areaId: areaContextMenu.areaId,
+          currentName: area.name,
+          newName: area.name,
+        });
+      }
+    }
+  };
+
+  const handleAreaRenameConfirm = () => {
+    if (areaRenameModal.areaId !== null && areaRenameModal.newName.trim()) {
+      updateArea(areaRenameModal.areaId, {
+        name: areaRenameModal.newName.trim(),
+      });
+      setAreaRenameModal({
+        visible: false,
+        areaId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success("Area renamed successfully!");
+    }
+  };
+
+  const handleAreaRenameCancel = () => {
+    setAreaRenameModal({
+      visible: false,
+      areaId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleAreaChangeColor = () => {
+    if (areaContextMenu.areaId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          currentTab: Tab.AREAS,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_area_${areaContextMenu.areaId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      deleteArea(areaContextMenu.areaId, true);
+      handleAreaContextMenuClose();
+    }
+  };
+
+  // Note context menu handlers
+  const handleNoteContextMenu = (e, noteId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setNoteContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      noteId: noteId,
+    });
+  };
+
+  const handleNoteContextMenuClose = () => {
+    setNoteContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      noteId: null,
+    });
+  };
+
+  const handleEditNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          currentTab: Tab.NOTES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_note_${noteContextMenu.noteId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleRenameNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      const note = notes.find((n) => n.id === noteContextMenu.noteId);
+      if (note) {
+        setNoteRenameModal({
+          visible: true,
+          noteId: noteContextMenu.noteId,
+          currentName: note.title,
+          newName: note.title,
+        });
+      }
+    }
+  };
+
+  const handleNoteRenameConfirm = () => {
+    if (noteRenameModal.noteId !== null && noteRenameModal.newName.trim()) {
+      updateNote(noteRenameModal.noteId, {
+        title: noteRenameModal.newName.trim(),
+      });
+      setNoteRenameModal({
+        visible: false,
+        noteId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success("Note renamed successfully!");
+    }
+  };
+
+  const handleNoteRenameCancel = () => {
+    setNoteRenameModal({
+      visible: false,
+      noteId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleEditNoteContent = () => {
+    if (noteContextMenu.noteId !== null) {
+      // Focus on the textarea for the note
+      const textarea = document.getElementById(
+        `note_${noteContextMenu.noteId}`,
+      );
+      if (textarea) {
+        textarea.focus();
+      }
+    }
+  };
+
+  const handleNoteChangeColor = () => {
+    if (noteContextMenu.noteId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          currentTab: Tab.NOTES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_note_${noteContextMenu.noteId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      deleteNote(noteContextMenu.noteId, true);
+      handleNoteContextMenuClose();
+    }
+  };
+
   /**
    * @param {PointerEvent} e
    * @param {*} id
@@ -606,6 +922,14 @@ export default function Canvas() {
 
     if (relationshipContextMenu.visible && e.button === 0) {
       handleRelationshipContextMenuClose();
+    }
+
+    if (areaContextMenu.visible && e.button === 0) {
+      handleAreaContextMenuClose();
+    }
+
+    if (noteContextMenu.visible && e.button === 0) {
+      handleNoteContextMenuClose();
     }
 
     if (selectedElement.open && !layout.sidebar) return;
@@ -1521,6 +1845,7 @@ export default function Canvas() {
               onPointerDown={(e) =>
                 handlePointerDownOnElement(e, a.id, ObjectType.AREA)
               }
+              onContextMenu={handleAreaContextMenu}
               setResize={setAreaResize}
               setInitCoords={setInitCoords}
             />
@@ -1616,6 +1941,7 @@ export default function Canvas() {
               onPointerDown={(e) =>
                 handlePointerDownOnElement(e, n.id, ObjectType.NOTE)
               }
+              onContextMenu={handleNoteContextMenu}
             />
           ))}
         </svg>
@@ -1727,6 +2053,29 @@ export default function Canvas() {
         }
       />
 
+      <AreaContextMenu
+        visible={areaContextMenu.visible}
+        x={areaContextMenu.x}
+        y={areaContextMenu.y}
+        onClose={handleAreaContextMenuClose}
+        onEdit={handleEditArea}
+        onDelete={handleDeleteArea}
+        onRename={handleRenameArea}
+        onChangeColor={handleAreaChangeColor}
+      />
+
+      <NoteContextMenu
+        visible={noteContextMenu.visible}
+        x={noteContextMenu.x}
+        y={noteContextMenu.y}
+        onClose={handleNoteContextMenuClose}
+        onEdit={handleEditNote}
+        onDelete={handleDeleteNote}
+        onRename={handleRenameNote}
+        onEditContent={handleEditNoteContent}
+        onChangeColor={handleNoteChangeColor}
+      />
+
       <Modal
         title={t("rename") + " Table"}
         visible={renameModal.visible}
@@ -1789,6 +2138,72 @@ export default function Canvas() {
             placeholder={t("name")}
             autoFocus
             onEnterPress={handleRelationshipRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Area"}
+        visible={areaRenameModal.visible}
+        onOk={handleAreaRenameConfirm}
+        onCancel={handleAreaRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            value={areaRenameModal.newName}
+            onChange={(value) =>
+              setAreaRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            autoFocus
+            onEnterPress={handleAreaRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Note"}
+        visible={noteRenameModal.visible}
+        onOk={handleNoteRenameConfirm}
+        onCancel={handleNoteRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("title")}:
+          </label>
+          <Input
+            value={noteRenameModal.newName}
+            onChange={(value) =>
+              setNoteRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("title")}
+            autoFocus
+            onEnterPress={handleNoteRenameConfirm}
           />
         </div>
       </Modal>
