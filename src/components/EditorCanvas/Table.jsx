@@ -51,13 +51,11 @@ export default function Table(props) {
   const { selectedElement, setSelectedElement } = useSelect();
 
   useEffect(() => {
-    // Check if we need to update the table name
     const desiredTableCase = settings.upperCaseFields
       ? tableData.name.toUpperCase()
       : tableData.name.toLowerCase();
     const tableNameNeedsUpdate = tableData.name !== desiredTableCase;
 
-    // Check if any field names need to be updated
     const fieldsNeedUpdate = tableData.fields.some((field) => {
       const desiredFieldCase = settings.upperCaseFields
         ? field.name.toUpperCase()
@@ -65,9 +63,7 @@ export default function Table(props) {
       return field.name !== desiredFieldCase;
     });
 
-    // Only update if there are actual changes needed
     if (tableNameNeedsUpdate || fieldsNeedUpdate) {
-      // Create updated fields with correct case
       const updatedFields = tableData.fields.map((field) => ({
         ...field,
         name: settings.upperCaseFields
@@ -75,7 +71,6 @@ export default function Table(props) {
           : field.name.toLowerCase(),
       }));
 
-      // Update both table name and fields
       updateTable(tableData.id, {
         name: settings.upperCaseFields
           ? tableData.name.toUpperCase()
@@ -204,11 +199,9 @@ export default function Table(props) {
     e.stopPropagation();
 
     if (onContextMenu) {
-      // Check if the right-click was on the table header (not on a field)
       const isFieldArea = e.target.closest('[data-field-area="true"]');
 
       if (!isFieldArea) {
-        // Get the position relative to the viewport
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX;
         const y = e.clientY;

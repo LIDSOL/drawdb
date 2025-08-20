@@ -137,7 +137,6 @@ export default function Canvas() {
     pointerY: 0,
   });
 
-  // Context menu state
   const [contextMenu, setContextMenu] = useState({
     visible: false,
     x: 0,
@@ -145,7 +144,6 @@ export default function Canvas() {
     tableId: null,
   });
 
-  // Rename modal state
   const [renameModal, setRenameModal] = useState({
     visible: false,
     tableId: null,
@@ -153,7 +151,6 @@ export default function Canvas() {
     newName: "",
   });
 
-  // Handle table context menu
   const handleTableContextMenu = (e, tableId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -227,14 +224,12 @@ export default function Canvas() {
     if (contextMenu.tableId !== null) {
       const table = tables.find((t) => t.id === contextMenu.tableId);
       if (table) {
-        // Get the next field ID
         const maxId = table.fields.reduce(
           (max, field) =>
             Math.max(max, typeof field.id === "number" ? field.id : -1),
           -1,
         );
 
-        // Create a new field with default values
         const newField = {
           id: maxId + 1,
           name: `field_${maxId + 1}`,
@@ -250,7 +245,6 @@ export default function Canvas() {
           foreignK: false,
         };
 
-        // Add the new field to the table
         const updatedFields = [...table.fields, newField];
         updateTable(contextMenu.tableId, {
           fields: updatedFields,
@@ -258,7 +252,6 @@ export default function Canvas() {
 
         Toast.success("Field added successfully!");
 
-        // Optionally open the editor to allow immediate editing of the new field
         setSelectedElement({
           element: ObjectType.TABLE,
           id: contextMenu.tableId,
@@ -280,6 +273,10 @@ export default function Canvas() {
    * @param {ObjectType[keyof ObjectType]} type
    */
   const handlePointerDownOnElement = (e, id, type) => {
+    if (contextMenu.visible && e.button === 0) {
+      handleContextMenuClose();
+    }
+
     if (selectedElement.open && !layout.sidebar) return;
     if (!e.isPrimary) return;
 
@@ -501,6 +498,10 @@ export default function Canvas() {
    * @param {PointerEvent} e
    */
   const handlePointerDown = (e) => {
+    if (contextMenu.visible && e.button === 0) {
+      handleContextMenuClose();
+    }
+
     if (e.isPrimary && e.target.id === "diagram") {
       // if the user clicks on the background, reset the selected element
       // desactivate area selection and move mode
@@ -1351,7 +1352,6 @@ export default function Canvas() {
         </div>
       )}
 
-      {/* Context Menu - rendered outside SVG */}
       <TableContextMenu
         visible={contextMenu.visible}
         x={contextMenu.x}
@@ -1363,7 +1363,6 @@ export default function Canvas() {
         onRename={handleRenameTable}
       />
 
-      {/* Rename Modal */}
       <Modal
         title={t("rename") + " Table"}
         visible={renameModal.visible}
