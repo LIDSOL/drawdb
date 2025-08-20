@@ -12,7 +12,7 @@ export function CrowParentLines(
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
-        className="group-hover:fill-sky-700"
+        className="group-hover:stroke-sky-700"
       />
       <line
         x1={cardinalityStartX - (10 * direction)}
@@ -21,7 +21,7 @@ export function CrowParentLines(
         y2={cardinalityStartY - 10}
         stroke="gray"
         strokeWidth="2"
-        className="group-hover:fill-sky-700"
+        className="group-hover:stroke-sky-700"
       />
     </>
   );
@@ -43,7 +43,7 @@ export function CrowParentDiamond(
       stroke="gray"
       strokeWidth="2"
       fill="white"
-      className="group-hover:fill-sky-700"
+      className="group-hover:stroke-sky-700"
     />
   );
 }

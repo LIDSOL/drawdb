@@ -26,7 +26,7 @@ import {
 
 const labelFontSize = 16;
 
-export default function Relationship({ data }) {
+export default function Relationship({ data, onContextMenu }) {
   const { settings } = useSettings();
   const { tables } = useDiagram();
   const { layout } = useLayout();
@@ -257,6 +257,19 @@ export default function Relationship({ data }) {
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (onContextMenu) {
+      onContextMenu(e, data.id, x, y);
+    }
+  };
+
   if ((settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && cardinalityEndX < cardinalityStartX){
     direction = -1;
   }
@@ -275,7 +288,7 @@ export default function Relationship({ data }) {
 
   return (
     <>
-      <g className="select-none group" onDoubleClick={edit}>
+      <g className="select-none group" onDoubleClick={edit} onContextMenu={handleContextMenu}>
         {/* Invisible path for larger hit area */}
         <path
           d={calcPath(
