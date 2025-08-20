@@ -1,4 +1,4 @@
-import { useRef, useState,useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Action,
   RelationshipType,
@@ -11,11 +11,12 @@ import {
   tableColorStripHeight,
   Notation,
 } from "../../data/constants";
-import { Toast } from "@douyinfe/semi-ui";
+import { Toast, Modal, Input } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
 import Note from "./Note";
+import TableContextMenu from "./TableContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -71,7 +72,7 @@ export default function Canvas() {
     pointer,
   } = canvasContextValue;
 
-  const { tables, updateTable, relationships, addRelationship, addChildToSubtype} =
+  const { tables, updateTable, relationships, addRelationship, deleteTable, addChildToSubtype} =
     useDiagram();
   const { areas, updateArea } = useAreas();
   const { notes, updateNote } = useNotes();
@@ -136,6 +137,143 @@ export default function Canvas() {
     pointerY: 0,
   });
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    tableId: null,
+  });
+
+  // Rename modal state
+  const [renameModal, setRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  // Handle table context menu
+  const handleTableContextMenu = (e, tableId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      tableId: tableId,
+    });
+  };
+
+  const handleContextMenuClose = () => {
+    setContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+    });
+  };
+
+  const handleEditTable = () => {
+    if (contextMenu.tableId !== null) {
+      setSelectedElement({
+        element: ObjectType.TABLE,
+        id: contextMenu.tableId,
+        open: true,
+      });
+    }
+  };
+
+  const handleRenameTable = () => {
+    if (contextMenu.tableId !== null) {
+      const table = tables.find((t) => t.id === contextMenu.tableId);
+      if (table) {
+        setRenameModal({
+          visible: true,
+          tableId: contextMenu.tableId,
+          currentName: table.name,
+          newName: table.name,
+        });
+      }
+    }
+  };
+
+  const handleRenameConfirm = () => {
+    if (renameModal.tableId !== null && renameModal.newName.trim()) {
+      updateTable(renameModal.tableId, {
+        name: renameModal.newName.trim(),
+      });
+      setRenameModal({
+        visible: false,
+        tableId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success("Table renamed successfully!");
+    }
+  };
+
+  const handleRenameCancel = () => {
+    setRenameModal({
+      visible: false,
+      tableId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleAddField = () => {
+    if (contextMenu.tableId !== null) {
+      const table = tables.find((t) => t.id === contextMenu.tableId);
+      if (table) {
+        // Get the next field ID
+        const maxId = table.fields.reduce(
+          (max, field) =>
+            Math.max(max, typeof field.id === "number" ? field.id : -1),
+          -1,
+        );
+
+        // Create a new field with default values
+        const newField = {
+          id: maxId + 1,
+          name: `field_${maxId + 1}`,
+          type: "VARCHAR",
+          size: "255",
+          notNull: false,
+          unique: false,
+          primary: false,
+          increment: false,
+          default: "",
+          check: "",
+          comment: "",
+          foreignK: false,
+        };
+
+        // Add the new field to the table
+        const updatedFields = [...table.fields, newField];
+        updateTable(contextMenu.tableId, {
+          fields: updatedFields,
+        });
+
+        Toast.success("Field added successfully!");
+
+        // Optionally open the editor to allow immediate editing of the new field
+        setSelectedElement({
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          open: true,
+        });
+      }
+    }
+  };
+
+  const handleDeleteTable = () => {
+    if (contextMenu.tableId !== null) {
+      deleteTable(contextMenu.tableId);
+    }
+  };
+
   /**
    * @param {PointerEvent} e
    * @param {*} id
@@ -146,12 +284,11 @@ export default function Canvas() {
     if (!e.isPrimary) return;
 
     // Verify if already selected (for multiple selection)
-    const alreadySelected =
-      Array.isArray(selectedElement.id)
-        ? selectedElement.id.includes(id)
-        : selectedElement.id === id;
+    const alreadySelected = Array.isArray(selectedElement.id)
+      ? selectedElement.id.includes(id)
+      : selectedElement.id === id;
 
-        let elementData;
+    let elementData;
     if (type === ObjectType.TABLE) {
       const table = tables.find((t) => t.id === id);
 
@@ -165,7 +302,7 @@ export default function Canvas() {
   elementData = table;
 
       let width = table.width || settings.tableWidth;
-      if (table.x - pointer.spaces.diagram.x < - width + 15) {
+      if (table.x - pointer.spaces.diagram.x < -width + 15) {
         setResizing({
           element: type,
           id: id,
@@ -261,7 +398,7 @@ export default function Canvas() {
       });
     } else if (resizing.element === ObjectType.TABLE && resizing.id >= 0) {
       const table = tables.find((t) => t.id === resizing.id);
-      const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180)
+      const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180);
       updateTable(resizing.id, {
         width: newWidth
       });
@@ -390,15 +527,15 @@ export default function Canvas() {
     if (e.altKey && e.button === 0) {
       setIsAreaSelecting(true);
       setSelectionArea({
-          startX: pointer.spaces.diagram.x,
-          startY: pointer.spaces.diagram.y,
-          x: pointer.spaces.diagram.x,
-          y: pointer.spaces.diagram.y,
-          width: 0,
-          height: 0,
+        startX: pointer.spaces.diagram.x,
+        startY: pointer.spaces.diagram.y,
+        x: pointer.spaces.diagram.x,
+        y: pointer.spaces.diagram.y,
+        width: 0,
+        height: 0,
       });
       return;
-  }
+    }
 
     // don't pan if the sidesheet for editing a table is open
     if (
@@ -432,7 +569,9 @@ export default function Canvas() {
       return dragging.id.some((id) => {
         const table = tables.find((t) => t.id === id);
         const initPos = dragging.initialPositions?.[id];
-        return table && initPos ? !(initPos.x === table.x && initPos.y === table.y) : false;
+        return table && initPos
+          ? !(initPos.x === table.x && initPos.y === table.y)
+          : false;
       });
     }
 
@@ -608,42 +747,54 @@ export default function Canvas() {
         setDragStart({
           x: pointer.spaces.diagram.x,
           y: pointer.spaces.diagram.y,
-        })
+        });
       }
       setIsAreaSelecting(false);
       return;
     }
 
     if (coordsDidUpdate(dragging.element)) {
-    const info = getMovedElementDetails();
-    // Use pushUndo to ensure centralized filtering/deduplication
-    pushUndo((() => {
-  if (Array.isArray(dragging.id)) {
+      const info = getMovedElementDetails();
+      // Use pushUndo to ensure centralized filtering/deduplication
+      pushUndo((() => {
+        if (Array.isArray(dragging.id)) {
+          // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
+          const originalPositionsArray = (dragging.initialPositions && typeof dragging.initialPositions === 'object')
+            // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
+            ? dragging.id.map((id) => {
+                const pos = dragging.initialPositions[id];
+                return pos ? { id, x: pos.x, y: pos.y } : { id, x: 0, y: 0 };
+              })
+            : dragging.id.map((id) => {
+                const t = tables.find(tt => tt.id === id);
+                return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
+              });
 
-        // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
-        const originalPositionsArray = (dragging.initialPositions && typeof dragging.initialPositions === 'object')
-        // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
-        ? dragging.id.map((id) => {
-          const pos = dragging.initialPositions[id];
-          return pos ? { id, x: pos.x, y: pos.y } : { id, x: 0, y: 0 };
-          })
-        : dragging.id.map((id) => {
-          const t = tables.find(tt => tt.id === id);
-          return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
-          });
+          const finalPositionsArray = dragging.id.map((id) => {
+            const table = tables.find((t) => t.id === id);
+            return table ? { id, x: table.x, y: table.y } : null;
+          }).filter(Boolean);
 
-        const finalPositionsArray = dragging.id.map((id) => {
-          const table = tables.find((t) => t.id === id);
-          return table ? { id, x: table.x, y: table.y } : null;
-        }).filter(Boolean);
-
+          const newAction = {
+            action: Action.MOVE,
+            element: dragging.element,
+            // originalPositions = positions before the move
+            originalPositions: originalPositionsArray,
+            // newPositions = positions after the move
+            newPositions: finalPositionsArray,
+            id: dragging.id,
+            message: t("move_element", {
+              coords: `(${info.x}, ${info.y})`,
+              name: info.name,
+            }),
+          };
+          return newAction;
+        }
         const newAction = {
           action: Action.MOVE,
           element: dragging.element,
-          // originalPositions = positions before the move
-          originalPositions: originalPositionsArray,
-          // newPositions = positions after the move
-          newPositions: finalPositionsArray,
+          from: { x: dragging.prevX, y: dragging.prevY },
+          to: { x: info.x, y: info.y },
           id: dragging.id,
           message: t("move_element", {
             coords: `(${info.x}, ${info.y})`,
@@ -651,21 +802,8 @@ export default function Canvas() {
           }),
         };
         return newAction;
-      }
-      const newAction = {
-        action: Action.MOVE,
-        element: dragging.element,
-        from: { x: dragging.prevX, y: dragging.prevY },
-        to: { x: info.x, y: info.y },
-        id: dragging.id,
-        message: t("move_element", {
-          coords: `(${info.x}, ${info.y})`,
-          name: info.name,
-        }),
-      };
-      return newAction;
-    })());
-    setRedoStack([]);
+      })());
+      setRedoStack([]);
     }
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setResizing({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
@@ -727,12 +865,12 @@ export default function Canvas() {
   };
 
   const handleGripField = (field, fieldTableid) => {
-      // A field can be a foreign key only if it's a primary key or both NOT NULL and UNIQUE.
-      // If it can't be selected, show an error message and exit.
-      if (!field.primary && !(field.notNull && field.unique)) {
-        Toast.info(t("cannot_fk"));
-        return;
-      }
+    // A field can be a foreign key only if it's a primary key or both NOT NULL and UNIQUE.
+    // If it can't be selected, show an error message and exit.
+    if (!field.primary && !(field.notNull && field.unique)) {
+      Toast.info(t("cannot_fk"));
+      return;
+    }
     setPanning((old) => ({ ...old, isPanning: false }));
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setLinkingLine({
@@ -787,11 +925,17 @@ export default function Canvas() {
         rel.startTableId === linkingLine.startTableId &&
         rel.endTableId === hoveredTable.tableId &&
         rel.startFieldId === linkingLine.startFieldId &&
-        rel.endFieldId === (parentFields.map(
-          (field, index) =>
-            childTable.fields.reduce(
-              (maxId, f) =>
-                Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index)[0])
+        rel.endFieldId ===
+          parentFields.map(
+            (field, index) =>
+              childTable.fields.reduce(
+                (maxId, f) =>
+                  Math.max(maxId, typeof f.id === "number" ? f.id : -1),
+                -1,
+              ) +
+              1 +
+              index,
+          )[0],
     );
     if (alreadyLinked) {
       Toast.info(t("duplicate_relationship"));
@@ -817,7 +961,13 @@ export default function Canvas() {
         tableId: parentTable.id,
         fieldId: field.id,
       },
-      id: childTable.fields.reduce((maxId, f) => Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index,
+      id:
+        childTable.fields.reduce(
+          (maxId, f) => Math.max(maxId, typeof f.id === "number" ? f.id : -1),
+          -1,
+        ) +
+        1 +
+        index,
     }));
     // Concatenate the existing fields with the new fields
     const updatedChildFields = [...childTable.fields, ...newFields];
@@ -826,8 +976,9 @@ export default function Canvas() {
       fields: updatedChildFields,
     });
     const actualStartFieldId = parentTable.fields.find(
-      (f) => f.id === linkingLine.startFieldId);
-    const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : 'table'}`;
+      (f) => f.id === linkingLine.startFieldId,
+    );
+    const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : "table"}`;
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -835,7 +986,8 @@ export default function Canvas() {
       endTableId: hoveredTable.tableId,
       endFieldId: newFields.length > 0 ? newFields[0].id : undefined,
       relationshipType: RelationshipType.ONE_TO_ONE, // Default, can be changed by editing the relationship
-      cardinality: RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
+      cardinality:
+        RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
@@ -1082,21 +1234,24 @@ export default function Canvas() {
                 onPointerDown={(e) =>
                   handlePointerDownOnElement(e, table.id, ObjectType.TABLE)
                 }
+                onContextMenu={handleTableContextMenu}
               />
             );
           })}
-          {/*Draw the selection areas*/
-          isAreaSelecting && (
-            <rect
-              x={selectionArea.x}
-              y={selectionArea.y}
-              width={selectionArea.width}
-              height={selectionArea.height}
-              fill="rgba(99, 152, 191, 0.3)"
-              stroke="rgb(99, 152, 191)"
-              strokeWidth="2"
-            />
-          )}
+          {
+            /*Draw the selection areas*/
+            isAreaSelecting && (
+              <rect
+                x={selectionArea.x}
+                y={selectionArea.y}
+                width={selectionArea.width}
+                height={selectionArea.height}
+                fill="rgba(99, 152, 191, 0.3)"
+                stroke="rgb(99, 152, 191)"
+                strokeWidth="2"
+              />
+            )
+          }
           {linking && (
             <path
               d={`M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`}
@@ -1195,6 +1350,52 @@ export default function Canvas() {
           </table>
         </div>
       )}
+
+      {/* Context Menu - rendered outside SVG */}
+      <TableContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={handleContextMenuClose}
+        onEdit={handleEditTable}
+        onDelete={handleDeleteTable}
+        onAddField={handleAddField}
+        onRename={handleRenameTable}
+      />
+
+      {/* Rename Modal */}
+      <Modal
+        title={t("rename") + " Table"}
+        visible={renameModal.visible}
+        onOk={handleRenameConfirm}
+        onCancel={handleRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            value={renameModal.newName}
+            onChange={(value) =>
+              setRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            autoFocus
+            onEnterPress={handleRenameConfirm}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

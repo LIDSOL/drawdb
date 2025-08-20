@@ -16,14 +16,16 @@ import {
 import { Popover, Tag, Button, SideSheet } from "@douyinfe/semi-ui";
 import { useLayout, useSettings, useDiagram, useSelect } from "../../hooks";
 import TableInfo from "../EditorSidePanel/TablesTab/TableInfo";
-import { useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../data/datatypes";
 import { isRtl } from "../../i18n/utils/rtl";
 import i18n from "../../i18n/i18n";
 
 //Helper function to calculate text width
 const getTextWidth = (text, font) => {
-  const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement("canvas"));
+  const canvas =
+    getTextWidth.canvas ||
+    (getTextWidth.canvas = document.createElement("canvas"));
   const context = canvas.getContext("2d");
   context.font = font;
   const metrics = context.measureText(text);
@@ -40,6 +42,7 @@ export default function Table(props) {
     handleGripField,
     setLinkingLine,
     moving,
+    onContextMenu,
   } = props;
   const { layout } = useLayout();
   const { deleteTable, deleteField } = useDiagram();
@@ -49,27 +52,35 @@ export default function Table(props) {
 
   useEffect(() => {
     // Check if we need to update the table name
-    const desiredTableCase = settings.upperCaseFields ? tableData.name.toUpperCase() : tableData.name.toLowerCase();
+    const desiredTableCase = settings.upperCaseFields
+      ? tableData.name.toUpperCase()
+      : tableData.name.toLowerCase();
     const tableNameNeedsUpdate = tableData.name !== desiredTableCase;
 
     // Check if any field names need to be updated
-    const fieldsNeedUpdate = tableData.fields.some(field => {
-      const desiredFieldCase = settings.upperCaseFields ? field.name.toUpperCase() : field.name.toLowerCase();
+    const fieldsNeedUpdate = tableData.fields.some((field) => {
+      const desiredFieldCase = settings.upperCaseFields
+        ? field.name.toUpperCase()
+        : field.name.toLowerCase();
       return field.name !== desiredFieldCase;
     });
 
     // Only update if there are actual changes needed
     if (tableNameNeedsUpdate || fieldsNeedUpdate) {
       // Create updated fields with correct case
-      const updatedFields = tableData.fields.map(field => ({
+      const updatedFields = tableData.fields.map((field) => ({
         ...field,
-        name: settings.upperCaseFields ? field.name.toUpperCase() : field.name.toLowerCase()
+        name: settings.upperCaseFields
+          ? field.name.toUpperCase()
+          : field.name.toLowerCase(),
       }));
 
       // Update both table name and fields
       updateTable(tableData.id, {
-        name: settings.upperCaseFields ? tableData.name.toUpperCase() : tableData.name.toLowerCase(),
-        fields: updatedFields
+        name: settings.upperCaseFields
+          ? tableData.name.toUpperCase()
+          : tableData.name.toLowerCase(),
+        fields: updatedFields,
       });
     }
   }, [
@@ -77,10 +88,10 @@ export default function Table(props) {
     tableData.fields,
     tableData.id,
     tableData.name,
-    updateTable
+    updateTable,
   ]);
   const calculatedContentWidth = useMemo(() => {
-    if(!tableData) return settings.tableWidth;
+    if (!tableData) return settings.tableWidth;
 
     let maxCalculatedWidth = 0;
     const baseFontSize = 14;
@@ -93,7 +104,7 @@ export default function Table(props) {
     const headerIconsWidth = 70;
     maxCalculatedWidth = Math.max(
       maxCalculatedWidth,
-      tableNameWidth + headerHorizontalPadding + headerIconsWidth
+      tableNameWidth + headerHorizontalPadding + headerIconsWidth,
     );
 
     // Calculate the width of each field
@@ -110,28 +121,39 @@ export default function Table(props) {
 
       let typeString = field.type || "";
       const fieldTypeInfo = dbToTypes[database]?.[field.type];
-      if ((fieldTypeInfo?.isSized || fieldTypeInfo?.hasPrecision) && field.size && String(field.size).trim() !== "") {
+      if (
+        (fieldTypeInfo?.isSized || fieldTypeInfo?.hasPrecision) &&
+        field.size &&
+        String(field.size).trim() !== ""
+      ) {
         typeString += `(${field.size})`;
       }
       currentFieldContentWidth += getTextWidth(typeString, fieldFont);
 
       let indicatorsWidth = spaceBetweenNameAndType; // Initial space before indicators
-      if (settings.notation === 'default') {
+      if (settings.notation === "default") {
         if (field.primary) indicatorsWidth += 16 + 4; // IconKeyStroked approx 16px + margin
         if (!field.notNull) indicatorsWidth += getTextWidth("?", fieldFont) + 4; // '?' char + margin
       } else {
-        indicatorsWidth += getTextWidth(field.notNull ? "NOT NULL" : "NULL", fieldFont) + 4; // text + margin
+        indicatorsWidth +=
+          getTextWidth(field.notNull ? "NOT NULL" : "NULL", fieldFont) + 4; // text + margin
       }
       currentFieldContentWidth += indicatorsWidth;
 
-      const totalFieldRowWidth = fieldRowHorizontalPadding + gripButtonWidth + currentFieldContentWidth + spaceForHoverDeleteIcon;
+      const totalFieldRowWidth =
+        fieldRowHorizontalPadding +
+        gripButtonWidth +
+        currentFieldContentWidth +
+        spaceForHoverDeleteIcon;
       maxCalculatedWidth = Math.max(maxCalculatedWidth, totalFieldRowWidth);
     });
 
     const minTableWidth = 180;
     const safetyBuffer = 25; // Extra buffer for aesthetics and measurement inaccuracies
-    return Math.max(minTableWidth, Math.ceil(maxCalculatedWidth + safetyBuffer));
-
+    return Math.max(
+      minTableWidth,
+      Math.ceil(maxCalculatedWidth + safetyBuffer),
+    );
   }, [tableData, settings.notation, database, settings.tableWidth]);
 
   useEffect(() => {
@@ -145,7 +167,13 @@ export default function Table(props) {
         updateTable(tableData.id, { width: calculatedContentWidth });
       }
     }
-  }, [tableData.id, tableData.width, calculatedContentWidth, updateTable, settings.tableWidth]);
+  }, [
+    tableData.id,
+    tableData.width,
+    calculatedContentWidth,
+    updateTable,
+    settings.tableWidth,
+  ]);
 
   const height =
     tableData.fields.length * tableFieldHeight + tableHeaderHeight + 7;
@@ -171,7 +199,28 @@ export default function Table(props) {
         .scrollIntoView({ behavior: "smooth" });
     }
   };
-  const primaryKeyCount = tableData.fields.filter(field => field.primary).length;
+  const handleTableContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (onContextMenu) {
+      // Check if the right-click was on the table header (not on a field)
+      const isFieldArea = e.target.closest('[data-field-area="true"]');
+
+      if (!isFieldArea) {
+        // Get the position relative to the viewport
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+
+        onContextMenu(e, tableData.id, x, y);
+      }
+    }
+  };
+
+  const primaryKeyCount = tableData.fields.filter(
+    (field) => field.primary,
+  ).length;
 
   const sortedFields = [...tableData.fields].sort((a, b) => {
     const aIsPK = a.primary;
@@ -232,42 +281,44 @@ export default function Table(props) {
         <div
           onDoubleClick={openEditor}
           className={`select-none w-full ${
-            (selectedElement.element === ObjectType.TABLE && selectedElement.id === tableData.id)
+            selectedElement.element === ObjectType.TABLE &&
+            selectedElement.id === tableData.id
               ? `border-2 border-solid border-blue-500 ${settings.notation === Notation.DEFAULT ? "rounded-lg" : ""}`
-              : (moving ||
+              : moving ||
                   (selectedElement.element === ObjectType.TABLE &&
                     (Array.isArray(selectedElement.id)
                       ? selectedElement.id.includes(tableData.id)
-                      : selectedElement.id === tableData.id)))
+                      : selectedElement.id === tableData.id))
                 ? `border-2 border-dashed border-blue-500 ${settings.notation === Notation.DEFAULT ? "rounded-lg" : ""}`
                 : settings.notation !== Notation.DEFAULT
                   ? "border-none"
                   : "border-2 border-zinc-500 rounded-lg hover:border-dashed hover:border-blue-500"
-            }`}
+          }`}
           style={{ direction: "ltr" }}
         >
           <div
             className={`h-[10px] w-full ${
-               settings.notation !== Notation.DEFAULT
-                 ? ""
-                 : "rounded-t-md"
+              settings.notation !== Notation.DEFAULT ? "" : "rounded-t-md"
             }`}
-            style={{ backgroundColor: tableData.color, height: settings.notation !== Notation.DEFAULT ? 0 : "10px" }}
+            style={{
+              backgroundColor: tableData.color,
+              height: settings.notation !== Notation.DEFAULT ? 0 : "10px",
+            }}
           />
           <div
             className={`overflow-hidden font-bold h-[40px] flex justify-between items-center border-b border-gray-400 ${
               settings.notation !== Notation.DEFAULT
-              ? "bg-transparent"
-              : settings.mode === "light"
-              ? "bg-zinc-200"
-              : "bg-zinc-900"
+                ? "bg-transparent"
+                : settings.mode === "light"
+                  ? "bg-zinc-200"
+                  : "bg-zinc-900"
             }`}
+            onContextMenu={handleTableContextMenu}
           >
-            <div className={` px-3 overflow-hidden text-ellipsis whitespace-nowrap ${
-               settings.notation !== Notation.DEFAULT
-                 ? ""
-                 : ""
-            }`}
+            <div
+              className={` px-3 overflow-hidden text-ellipsis whitespace-nowrap ${
+                settings.notation !== Notation.DEFAULT ? "" : ""
+              }`}
             >
               {tableData.name}
             </div>
@@ -454,53 +505,65 @@ export default function Table(props) {
     return (
       <div
         className={`
-          ${(tableData.fields.length === 1 && settings.notation === Notation.DEFAULT)
-            ? "rounded-b-md"
-            : ""
-          } ${(settings.notation !== Notation.DEFAULT && index === tableData.fields.length - 1)
-              ? (
-                  primaryKeyCount === tableData.fields.length
-                    ? "border-l border-r border-b border-gray-400"
-                    : "border-b border-gray-400"
-                )
+          ${
+            tableData.fields.length === 1 &&
+            settings.notation === Notation.DEFAULT
+              ? "rounded-b-md"
               : ""
           } ${
-          (fieldData.primary && settings.notation !== Notation.DEFAULT && primaryKeyCount === 1)
-            ? "border-b border-gray-400"
-            : ""
+            settings.notation !== Notation.DEFAULT &&
+            index === tableData.fields.length - 1
+              ? primaryKeyCount === tableData.fields.length
+                ? "border-l border-r border-b border-gray-400"
+                : "border-b border-gray-400"
+              : ""
           } ${
-            (fieldData.primary && settings.notation !== Notation.DEFAULT && index ===primaryKeyCount - 1)
+            fieldData.primary &&
+            settings.notation !== Notation.DEFAULT &&
+            primaryKeyCount === 1
               ? "border-b border-gray-400"
               : ""
           } ${
-          (!fieldData.primary && settings.notation !== Notation.DEFAULT )
-            ? "border-l border-r"
-            : ""
-          } ${
-          settings.mode === "light"
-            ? "bg-zinc-100 text-zinc-800"
-            : "bg-zinc-800 text-zinc-200"
-          } ${
-          (settings.notation !== Notation.DEFAULT && index !== tableData.fields.length - 1)
-            ? "border-l border-r border-gray-400"
-            : ""
-          } ${
-          (settings.notation !== Notation.DEFAULT && index === tableData.fields.length - 1)
-            ? "border-b border-gray-400"
-            : ""
-          } ${
-            (fieldData.primary && settings.notation === Notation.DEFAULT)
+            fieldData.primary &&
+            settings.notation !== Notation.DEFAULT &&
+            index === primaryKeyCount - 1
               ? "border-b border-gray-400"
               : ""
           } ${
-            (settings.notation === Notation.DEFAULT && index !== tableData.fields.length - 1 && fieldData.primary === false)
+            !fieldData.primary && settings.notation !== Notation.DEFAULT
+              ? "border-l border-r"
+              : ""
+          } ${
+            settings.mode === "light"
+              ? "bg-zinc-100 text-zinc-800"
+              : "bg-zinc-800 text-zinc-200"
+          } ${
+            settings.notation !== Notation.DEFAULT &&
+            index !== tableData.fields.length - 1
+              ? "border-l border-r border-gray-400"
+              : ""
+          } ${
+            settings.notation !== Notation.DEFAULT &&
+            index === tableData.fields.length - 1
               ? "border-b border-gray-400"
               : ""
           } ${
-          (settings.notation === Notation.DEFAULT && index === tableData.fields.length - 1)
-            ? "rounded-b-md"
-            : ""
-        } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`}
+            fieldData.primary && settings.notation === Notation.DEFAULT
+              ? "border-b border-gray-400"
+              : ""
+          } ${
+            settings.notation === Notation.DEFAULT &&
+            index !== tableData.fields.length - 1 &&
+            fieldData.primary === false
+              ? "border-b border-gray-400"
+              : ""
+          } ${
+            settings.notation === Notation.DEFAULT &&
+            index === tableData.fields.length - 1
+              ? "rounded-b-md"
+              : ""
+          } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`}
+        data-field-area="true"
         onPointerEnter={(e) => {
           if (!e.isPrimary) return;
 
@@ -528,17 +591,24 @@ export default function Table(props) {
         >
           <button
             className={`flex-shrink-0 w-[10px] h-[10px] bg-[#2f68adcc] rounded-full ${
-              (fieldData.primary && settings.notation !== Notation.DEFAULT)
+              fieldData.primary && settings.notation !== Notation.DEFAULT
                 ? "bg-[#ff2222cc]"
                 : "bg-[#2f68adcc]"
             }`}
             onPointerDown={(e) => {
               if (!e.isPrimary) return;
 
-              handleGripField(fieldData,tableData.id);
+              handleGripField(fieldData, tableData.id);
 
-              const effectiveColorStripHeight = settings.notation === Notation.DEFAULT ? tableColorStripHeight : 0;
-              const gripYOffset = tableHeaderHeight + effectiveColorStripHeight + (index * tableFieldHeight) + (tableFieldHeight / 2);
+              const effectiveColorStripHeight =
+                settings.notation === Notation.DEFAULT
+                  ? tableColorStripHeight
+                  : 0;
+              const gripYOffset =
+                tableHeaderHeight +
+                effectiveColorStripHeight +
+                index * tableFieldHeight +
+                tableFieldHeight / 2;
               const gripXOffset = settings.tableWidth / 2; // Or a fixed small offset from table edge
 
               setLinkingLine((prev) => ({
@@ -547,7 +617,7 @@ export default function Table(props) {
                 // This setLinkingLine is primarily for the visual startX/startY of the temporary line.
                 startX: tableData.x + gripXOffset,
                 startY: tableData.y + gripYOffset,
-                endX: tableData.x + gripXOffset,   // Initialize end to start
+                endX: tableData.x + gripXOffset, // Initialize end to start
                 endY: tableData.y + gripYOffset,
               }));
             }}
@@ -569,7 +639,7 @@ export default function Table(props) {
             />
           ) : (
             <div className="flex gap-1 items-center">
-              {fieldData.primary &&
+              {fieldData.primary && (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -578,15 +648,18 @@ export default function Table(props) {
                   className="bi bi-key"
                   viewBox="0 0 16 16"
                 >
-                  <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0
+                  <path
+                    d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0
                     .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11
                     9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4
                     4 0 0 1 0 8m4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5
                     0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1
-                    .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5"/>
-                  <path d="M4 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-                </svg>}
-              {fieldData.foreignK &&
+                    .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5"
+                  />
+                  <path d="M4 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />
+                </svg>
+              )}
+              {fieldData.foreignK && (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="20"
@@ -595,40 +668,43 @@ export default function Table(props) {
                   className="bi bi-key"
                   viewBox="0 0 16 16"
                 >
-                  <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0
+                  <path
+                    d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0
                     .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11
                     9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4
                     4 0 0 1 0 8m4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5
                     0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1
-                    .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5"/>
-                  <path d="M4 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-                </svg>}
+                    .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5"
+                  />
+                  <path d="M4 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />
+                </svg>
+              )}
               {settings.notation !== Notation.DEFAULT ? (
                 <>
-                <span>
-                  {fieldData.type +
-                    ((dbToTypes[database][fieldData.type].isSized ||
-                      dbToTypes[database][fieldData.type].hasPrecision) &&
-                    fieldData.size &&
-                    fieldData.size !== ""
-                      ? "(" + fieldData.size + ")"
-                      : "")}
-                </span>
-                {!fieldData.notNull && <span>NULL</span>}
-                {fieldData.notNull && <span>NOT NULL</span>}
+                  <span>
+                    {fieldData.type +
+                      ((dbToTypes[database][fieldData.type].isSized ||
+                        dbToTypes[database][fieldData.type].hasPrecision) &&
+                      fieldData.size &&
+                      fieldData.size !== ""
+                        ? "(" + fieldData.size + ")"
+                        : "")}
+                  </span>
+                  {!fieldData.notNull && <span>NULL</span>}
+                  {fieldData.notNull && <span>NOT NULL</span>}
                 </>
               ) : (
                 <>
                   {!fieldData.notNull && <span>?</span>}
                   <span>
-                  {fieldData.type +
-                    ((dbToTypes[database][fieldData.type].isSized ||
-                      dbToTypes[database][fieldData.type].hasPrecision) &&
-                    fieldData.size &&
-                    fieldData.size !== ""
-                      ? "(" + fieldData.size + ")"
-                      : "")}
-                </span>
+                    {fieldData.type +
+                      ((dbToTypes[database][fieldData.type].isSized ||
+                        dbToTypes[database][fieldData.type].hasPrecision) &&
+                      fieldData.size &&
+                      fieldData.size !== ""
+                        ? "(" + fieldData.size + ")"
+                        : "")}
+                  </span>
                 </>
               )}
             </div>
