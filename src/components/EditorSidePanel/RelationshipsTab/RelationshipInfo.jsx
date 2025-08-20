@@ -12,6 +12,7 @@ import {
   IconDeleteStroked,
   IconLoopTextStroked,
   IconMore,
+  IconRefresh,
 } from "@douyinfe/semi-icons";
 import {
   RelationshipType,
@@ -22,7 +23,7 @@ import {
   ObjectType,
   Notation,
 } from "../../../data/constants";
-import { useDiagram, useSettings, useUndoRedo} from "../../../hooks";
+import { useDiagram, useSettings, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -40,8 +41,13 @@ const columns = [
 export default function RelationshipInfo({ data }) {
   const { setUndoStack, setRedoStack } = useUndoRedo();
   const { settings } = useSettings();
-  const { tables, setTables, setRelationships, deleteRelationship, updateRelationship, removeChildFromSubtype } =
-    useDiagram();
+  const {
+    tables,
+    setTables,
+    setRelationships,
+    deleteRelationship,
+    updateRelationship, removeChildFromSubtype,
+  } = useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
   // Helper function to get the effective end table ID and field ID
@@ -68,6 +74,34 @@ export default function RelationshipInfo({ data }) {
   };
 
   const effectiveEndTable = getEffectiveEndTable();
+
+  const isDefaultRelationshipName = (relationship, tables) => {
+    if (!relationship || !tables) return false;
+
+    const startTable = tables.find((t) => t.id === relationship.startTableId);
+    const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+    if (!startTable || !endTable) return false;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === relationship.startFieldId,
+    );
+    const endField = endTable.fields?.find(
+      (f) => f.id === relationship.endFieldId,
+    );
+
+    if (!startField || !endField) return false;
+
+    // Check if it matches the original creation pattern: parentTable_parentField
+    const originalPattern = `${startTable.name}_${startField.name}`;
+
+    // Check if it matches the fk pattern: fk_endTable_endField_startTable
+    const fkPattern = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    return (
+      relationship.name === originalPattern || relationship.name === fkPattern
+    );
+  };
 
   const swapKeys = () => {
     // Disable swap for subtype relationships with multiple children
@@ -308,8 +342,14 @@ export default function RelationshipInfo({ data }) {
 
     const fkFieldIds = fkFields.map(field => field.id);
     const newNotNullValue = !fkFields[0].notNull;
-    const undoFields = fkFields.map(field => ({ id: field.id, notNull: field.notNull }));
-    const redoFields = fkFields.map(field => ({ id: field.id, notNull: newNotNullValue }));
+    const undoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: field.notNull,
+    }));
+    const redoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: newNotNullValue,
+    }));
 
     setUndoStack((prev) => [
       ...prev,
@@ -345,6 +385,42 @@ export default function RelationshipInfo({ data }) {
         return table;
       }),
     );
+  };
+
+  const setDefaultName = () => {
+    const startTable = tables.find((t) => t.id === data.startTableId);
+    const endTable = tables.find((t) => t.id === data.endTableId);
+
+    if (!startTable || !endTable) return;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === data.startFieldId,
+    );
+    const endField = endTable.fields?.find((f) => f.id === data.endFieldId);
+
+    if (!startField || !endField) return;
+
+    const defaultName = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    if (data.name === defaultName) return; // Already has default name
+
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        component: "self",
+        rid: data.id,
+        undo: { name: data.name },
+        redo: { name: defaultName },
+        message: t("edit_relationship", {
+          refName: defaultName,
+          extra: "[set default name]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    updateRelationship(data.id, { name: defaultName });
   };
 
   const removeSubtypeHierarchy = (indexToRemove) => {
@@ -432,6 +508,11 @@ export default function RelationshipInfo({ data }) {
                     {t("swap")}
                   </Button>
                 </div>
+                <div className="mt-2">
+                  <Button icon={<IconRefresh />} block onClick={setDefaultName}>
+                    Set Default Name
+                  </Button>
+                </div>
               </div>
             }
             trigger="click"
@@ -470,7 +551,8 @@ export default function RelationshipInfo({ data }) {
               disabled={!data.relationshipType}
               placeholder={t("select_cardinality")}
             />
-            {(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && (
+            {(settings.notation === Notation.CROWS_FOOT ||
+              settings.notation === Notation.IDEF1X) && (
               <Button
                 icon={<IconLoopTextStroked />}
                 type="tertiary"

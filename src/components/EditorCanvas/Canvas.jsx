@@ -17,6 +17,7 @@ import Area from "./Area";
 import Relationship from "./Relationship";
 import Note from "./Note";
 import TableContextMenu from "./TableContextMenu";
+import RelationshipContextMenu from "./RelationshipContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -72,8 +73,7 @@ export default function Canvas() {
     pointer,
   } = canvasContextValue;
 
-  const { tables, updateTable, relationships, addRelationship, deleteTable, addChildToSubtype} =
-    useDiagram();
+  const { tables, updateTable, relationships, addRelationship, deleteTable, addChildToSubtype, deleteRelationship, updateRelationship, setRelationships, setTables } = useDiagram();
   const { areas, updateArea } = useAreas();
   const { notes, updateNote } = useNotes();
   const { layout } = useLayout();
@@ -144,9 +144,23 @@ export default function Canvas() {
     tableId: null,
   });
 
+  const [relationshipContextMenu, setRelationshipContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    relationshipId: null,
+  });
+
   const [renameModal, setRenameModal] = useState({
     visible: false,
     tableId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [relationshipRenameModal, setRelationshipRenameModal] = useState({
+    visible: false,
+    relationshipId: null,
     currentName: "",
     newName: "",
   });
@@ -169,6 +183,27 @@ export default function Canvas() {
       x: 0,
       y: 0,
       tableId: null,
+    });
+  };
+
+  const handleRelationshipContextMenu = (e, relationshipId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setRelationshipContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      relationshipId: relationshipId,
+    });
+  };
+
+  const handleRelationshipContextMenuClose = () => {
+    setRelationshipContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      relationshipId: null,
     });
   };
 
@@ -215,6 +250,32 @@ export default function Canvas() {
     setRenameModal({
       visible: false,
       tableId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleRelationshipRenameConfirm = () => {
+    if (
+      relationshipRenameModal.relationshipId !== null &&
+      relationshipRenameModal.newName.trim()
+    ) {
+      updateRelationship(relationshipRenameModal.relationshipId, {
+        name: relationshipRenameModal.newName.trim(),
+      });
+      setRelationshipRenameModal({
+        visible: false,
+        relationshipId: null,
+        currentName: "",
+        newName: "",
+      });
+    }
+  };
+
+  const handleRelationshipRenameCancel = () => {
+    setRelationshipRenameModal({
+      visible: false,
+      relationshipId: null,
       currentName: "",
       newName: "",
     });
@@ -267,6 +328,272 @@ export default function Canvas() {
     }
   };
 
+  const handleEditRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      setSelectedElement({
+        element: ObjectType.RELATIONSHIP,
+        id: relationshipContextMenu.relationshipId,
+        open: true,
+      });
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleRenameRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship = relationships.find(
+        (r) => r.id === relationshipContextMenu.relationshipId,
+      );
+      if (relationship) {
+        setRelationshipRenameModal({
+          visible: true,
+          relationshipId: relationshipContextMenu.relationshipId,
+          currentName: relationship.name,
+          newName: relationship.name,
+        });
+        handleRelationshipContextMenuClose();
+      }
+    }
+  };
+
+  const isDefaultRelationshipName = (relationship, tables) => {
+    if (!relationship || !tables) return false;
+
+    const startTable = tables.find((t) => t.id === relationship.startTableId);
+    const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+    if (!startTable || !endTable) return false;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === relationship.startFieldId,
+    );
+    const endField = endTable.fields?.find(
+      (f) => f.id === relationship.endFieldId,
+    );
+
+    if (!startField || !endField) return false;
+
+    // Check if it matches the original creation pattern: parentTable_parentField
+    const originalPattern = `${startTable.name}_${startField.name}`;
+
+    // Check if it matches the fk pattern: fk_endTable_endField_startTable
+    const fkPattern = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    return (
+      relationship.name === originalPattern || relationship.name === fkPattern
+    );
+  };
+
+  const handleSwapRelationshipDirection = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const shouldUpdateName = isDefaultRelationshipName(
+          relationship,
+          tables,
+        );
+
+        const undoData = {
+          startTableId: relationship.startTableId,
+          startFieldId: relationship.startFieldId,
+          endTableId: relationship.endTableId,
+          endFieldId: relationship.endFieldId,
+        };
+
+        const redoData = {
+          startTableId: relationship.endTableId,
+          startFieldId: relationship.endFieldId,
+          endTableId: relationship.startTableId,
+          endFieldId: relationship.startFieldId,
+        };
+
+        if (shouldUpdateName) {
+          undoData.name = relationship.name;
+          // Generate the new name after swapping
+          const newStartTable = tables.find(
+            (t) => t.id === relationship.endTableId,
+          );
+          const newEndTable = tables.find(
+            (t) => t.id === relationship.startTableId,
+          );
+          const newEndField = newEndTable?.fields?.find(
+            (f) => f.id === relationship.startFieldId,
+          );
+
+          if (newStartTable && newEndTable && newEndField) {
+            redoData.name = `fk_${newEndTable.name}_${newEndField.name}_${newStartTable.name}`;
+          }
+        }
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: undoData,
+            redo: redoData,
+            message: `Swap direction for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+
+        setRelationships((prev) =>
+          prev.map((e, idx) => {
+            if (idx === relationshipContextMenu.relationshipId) {
+              const updatedRelationship = {
+                ...e,
+                startTableId: e.endTableId,
+                startFieldId: e.endFieldId,
+                endTableId: e.startTableId,
+                endFieldId: e.startFieldId,
+              };
+
+              // Only update name if it's a default name
+              if (shouldUpdateName && redoData.name) {
+                updatedRelationship.name = redoData.name;
+              }
+
+              return updatedRelationship;
+            }
+            return e;
+          }),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleChangeRelationshipType = (newType) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const defaultCardinality =
+          RelationshipCardinalities[newType] &&
+          RelationshipCardinalities[newType][0]
+            ? RelationshipCardinalities[newType][0].label
+            : "";
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: {
+              relationshipType: relationship.relationshipType,
+              cardinality: relationship.cardinality,
+            },
+            redo: {
+              relationshipType: newType,
+              cardinality: defaultCardinality,
+            },
+            message: `Change type for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+        setRelationships((prev) =>
+          prev.map((e, idx) =>
+            idx === relationshipContextMenu.relationshipId
+              ? {
+                  ...e,
+                  relationshipType: newType,
+                  cardinality: defaultCardinality,
+                }
+              : e,
+          ),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleChangeRelationshipCardinality = (newCardinality) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: { cardinality: relationship.cardinality },
+            redo: { cardinality: newCardinality },
+            message: `Change cardinality for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+        setRelationships((prev) =>
+          prev.map((e, idx) =>
+            idx === relationshipContextMenu.relationshipId
+              ? { ...e, cardinality: newCardinality }
+              : e,
+          ),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleDeleteRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      deleteRelationship(relationshipContextMenu.relationshipId);
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleSetDefaultRelationshipName = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const startTable = tables.find(
+          (t) => t.id === relationship.startTableId,
+        );
+        const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+        if (!startTable || !endTable) return;
+
+        const startField = startTable.fields?.find(
+          (f) => f.id === relationship.startFieldId,
+        );
+        const endField = endTable.fields?.find(
+          (f) => f.id === relationship.endFieldId,
+        );
+
+        if (!startField || !endField) return;
+
+        const defaultName = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+        if (relationship.name === defaultName) {
+          handleRelationshipContextMenuClose();
+          return; // Already has default name
+        }
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: { name: relationship.name },
+            redo: { name: defaultName },
+            message: `Set default name for ${defaultName}`,
+          },
+        ]);
+        setRedoStack([]);
+        updateRelationship(relationshipContextMenu.relationshipId, {
+          name: defaultName,
+        });
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
   /**
    * @param {PointerEvent} e
    * @param {*} id
@@ -275,6 +602,10 @@ export default function Canvas() {
   const handlePointerDownOnElement = (e, id, type) => {
     if (contextMenu.visible && e.button === 0) {
       handleContextMenuClose();
+    }
+
+    if (relationshipContextMenu.visible && e.button === 0) {
+      handleRelationshipContextMenuClose();
     }
 
     if (selectedElement.open && !layout.sidebar) return;
@@ -500,6 +831,10 @@ export default function Canvas() {
   const handlePointerDown = (e) => {
     if (contextMenu.visible && e.button === 0) {
       handleContextMenuClose();
+    }
+
+    if (relationshipContextMenu.visible && e.button === 0) {
+      handleRelationshipContextMenuClose();
     }
 
     if (e.isPrimary && e.target.id === "diagram") {
@@ -1213,8 +1548,12 @@ export default function Canvas() {
             })
             .map((e, i) => (
             <Relationship
+             
               key={e.id || i}
+             
               data={e}
+              onContextMenu={handleRelationshipContextMenu}
+           
               onConnectSubtypePoint={handleSubtypePointClick}
             />
           ))}
@@ -1363,6 +1702,31 @@ export default function Canvas() {
         onRename={handleRenameTable}
       />
 
+      <RelationshipContextMenu
+        visible={relationshipContextMenu.visible}
+        x={relationshipContextMenu.x}
+        y={relationshipContextMenu.y}
+        onClose={handleRelationshipContextMenuClose}
+        onEdit={handleEditRelationship}
+        onDelete={handleDeleteRelationship}
+        onRename={handleRenameRelationship}
+        onSwapDirection={handleSwapRelationshipDirection}
+        onChangeType={handleChangeRelationshipType}
+        onChangeCardinality={handleChangeRelationshipCardinality}
+        onSetDefaultName={handleSetDefaultRelationshipName}
+        currentType={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]
+                ?.relationshipType
+            : null
+        }
+        currentCardinality={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]?.cardinality
+            : null
+        }
+      />
+
       <Modal
         title={t("rename") + " Table"}
         visible={renameModal.visible}
@@ -1392,6 +1756,39 @@ export default function Canvas() {
             placeholder={t("name")}
             autoFocus
             onEnterPress={handleRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Relationship"}
+        visible={relationshipRenameModal.visible}
+        onOk={handleRelationshipRenameConfirm}
+        onCancel={handleRelationshipRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            value={relationshipRenameModal.newName}
+            onChange={(value) =>
+              setRelationshipRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            autoFocus
+            onEnterPress={handleRelationshipRenameConfirm}
           />
         </div>
       </Modal>
