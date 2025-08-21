@@ -6,6 +6,7 @@ import {
   TagInput,
   InputNumber,
   Checkbox,
+  Toast,
 } from "@douyinfe/semi-ui";
 import { Action, ObjectType } from "../../../data/constants";
 import { IconDeleteStroked } from "@douyinfe/semi-icons";
@@ -203,6 +204,12 @@ export default function FieldDetails({ data, tid, index }) {
           value="unique"
           checked={data.unique}
           onChange={(checkedValues) => {
+            // If trying to remove unique from a primary key, show warning and don't change
+            if (data.primary && data.unique && !checkedValues.target.checked) {
+              Toast.info(t("pk_has_to_be_unique"));
+              return;
+            }
+
             setUndoStack((prev) => [
               ...prev,
               {
