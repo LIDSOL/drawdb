@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   IconEdit,
   IconDeleteStroked,
@@ -6,7 +6,6 @@ import {
   IconEdit2Stroked,
   IconCheckboxTick,
   IconMinus,
-  IconPlus,
 } from "@douyinfe/semi-icons";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks";

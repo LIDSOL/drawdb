@@ -357,14 +357,21 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
 
   let startFieldYOffset = 0;
   let endFieldYOffset = 0;
-  const effectiveColorStripHeight = settings.notation === Notation.DEFAULT ? tableColorStripHeight : 0;
-  const totalHeaderHeightForFields = tableHeaderHeight + effectiveColorStripHeight;
+  const effectiveColorStripHeight =
+    settings.notation === Notation.DEFAULT ? tableColorStripHeight : 0;
+  const totalHeaderHeightForFields =
+    tableHeaderHeight + effectiveColorStripHeight;
 
   if (startTable && startTable.fields && data.startFieldId !== undefined) {
     const sortedStartFields = getSortedFields(startTable.fields);
-    const startFieldIndex = sortedStartFields.findIndex(f => f.id === data.startFieldId);
+    const startFieldIndex = sortedStartFields.findIndex(
+      (f) => f.id === data.startFieldId,
+    );
     if (startFieldIndex !== -1) {
-      startFieldYOffset = totalHeaderHeightForFields + (startFieldIndex * tableFieldHeight) + (tableFieldHeight / 2);
+      startFieldYOffset =
+        totalHeaderHeightForFields +
+        startFieldIndex * tableFieldHeight +
+        tableFieldHeight / 2;
     } else {
       // Fallback if field not found, point to middle of table header or top
       startFieldYOffset = tableHeaderHeight / 2;
@@ -373,9 +380,14 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
 
   if (endTable && endTable.fields && effectiveEndFieldId !== undefined) {
     const sortedEndFields = getSortedFields(endTable.fields);
-    const endFieldIndex = sortedEndFields.findIndex(f => f.id === effectiveEndFieldId);
+    const endFieldIndex = sortedEndFields.findIndex(
+      (f) => f.id === effectiveEndFieldId,
+    );
     if (endFieldIndex !== -1) {
-      endFieldYOffset = totalHeaderHeightForFields + (endFieldIndex * tableFieldHeight) + (tableFieldHeight / 2);
+      endFieldYOffset =
+        totalHeaderHeightForFields +
+        endFieldIndex * tableFieldHeight +
+        tableFieldHeight / 2;
     } else {
       // Fallback, similar to startFieldYOffset
       endFieldYOffset = tableHeaderHeight / 2;
@@ -385,7 +397,9 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
   // This part for strokeDasharray remains the same
   let determinedRelationshipType = null;
   if (endTable && endTable.fields && effectiveEndFieldId !== undefined) {
-    const foreignKeyField = endTable.fields.find(field => field.id === effectiveEndFieldId);
+    const foreignKeyField = endTable.fields.find(
+      (field) => field.id === effectiveEndFieldId,
+    );
     if (foreignKeyField) {
       if (foreignKeyField.primary === true) {
         determinedRelationshipType = "0";
@@ -394,10 +408,13 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
       }
     }
   }
-  const relationshipType = determinedRelationshipType !== null ? determinedRelationshipType : (data.lineType || "0");
+  const relationshipType =
+    determinedRelationshipType !== null
+      ? determinedRelationshipType
+      : data.lineType || "0";
 
   const getForeignKeyFields = () => {
-    if(!endTable || !endTable.fields) return [];
+    if (!endTable || !endTable.fields) return [];
 
     // Handle both old format (single) and new format (array)
     if (data.endFieldIds && Array.isArray(data.endFieldIds)) {
@@ -414,14 +431,17 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
   let cardinalityStart = "1";
   let cardinalityEnd = "1";
 
-  const isCrowOrIDEF = settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X;
+  const isCrowOrIDEF =
+    settings.notation === Notation.CROWS_FOOT ||
+    settings.notation === Notation.IDEF1X;
   const isDefault = settings.notation === Notation.DEFAULT;
   const fkFields = getForeignKeyFields();
 
   // Skip cardinality calculation for subtype relationships
   if (!data.subtype && data.relationshipType !== RelationshipType.SUBTYPE) {
     if (isCrowOrIDEF) {
-      const allNullable = fkFields.length > 0 && fkFields.every(field => !field.notNull);
+      const allNullable =
+      fkFields.length > 0 && fkFields.every((field) => !field.notNull);
       cardinalityStart = allNullable
         ? ParentCardinality.NULLEABLE.label
         : ParentCardinality.DEFAULT.label;
@@ -436,12 +456,13 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
       }
     } else if (isDefault) {
       cardinalityStart = "1";
-      cardinalityEnd = data.relationshipType === RelationshipType.ONE_TO_MANY ? "n" : "1";
+      cardinalityEnd =
+      data.relationshipType === RelationshipType.ONE_TO_MANY ? "n" : "1";
     }
   }
   const formats = {
     notation: {
-      default:  {
+      default: {
         one_to_one: DefaultNotation,
         one_to_many: DefaultNotation,
       },
@@ -455,21 +476,18 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
         one_to_many: IDEFZM,
         parent_diamond: CrowParentDiamond,
       },
-    }
-  }
+    },
+  };
 
   // For subtype relationships, force specific notation regardless of global setting
   const effectiveNotationKey = data.subtype ?
     'default' :
     (settings.notation &&
-    Object.prototype.hasOwnProperty.call(
-      formats.notation,
-      settings.notation,
-    )
+    Object.prototype.hasOwnProperty.call(formats.notation, settings.notation)
       ? settings.notation
       : Notation.DEFAULT);
 
-    const currentNotation = formats.notation[effectiveNotationKey];
+  const currentNotation = formats.notation[effectiveNotationKey];
 
   let parentFormat = null;
   // Skip parent/child notation logic for subtype relationships
@@ -523,7 +541,6 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
   const cardinalityStartOffset = 30;
   const cardinalityEndOffset = 37;
 
-
   if (pathRef.current) {
     const totalPathLength = pathRef.current.getTotalLength();
 
@@ -535,9 +552,7 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
     cardinalityStartX = point1.x;
     cardinalityStartY = point1.y;
 
-    const point2 = pathRef.current.getPointAtLength(
-      totalPathLength - cardinalityEndOffset,
-    );
+    const point2 = pathRef.current.getPointAtLength(totalPathLength - cardinalityEndOffset);
     cardinalityEndX = point2.x;
     cardinalityEndY = point2.y;
 
@@ -556,17 +571,20 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
   const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    const rect = e.currentTarget.getBoundingClientRect();
+
     const x = e.clientX;
     const y = e.clientY;
-    
+
     if (onContextMenu) {
       onContextMenu(e, data.id, x, y);
     }
   };
 
-  if ((settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && cardinalityEndX < cardinalityStartX){
+  if (
+    (settings.notation === Notation.CROWS_FOOT ||
+      settings.notation === Notation.IDEF1X) &&
+    cardinalityEndX < cardinalityStartX
+  ) {
     direction = -1;
   }
 
@@ -606,13 +624,17 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
 
   return (
     <>
-      <g className="select-none group" onDoubleClick={edit} onContextMenu={handleContextMenu}>
+      <g
+        className="select-none group"
+        onDoubleClick={edit}
+        onContextMenu={handleContextMenu}
+      >
         {/* Invisible path for larger hit area */}
         <path
           d={calcPath(
             pathData,
             tables[data.startTableId].width,
-            tables[data.endTableId].width
+            tables[data.endTableId].width,
           )}
           stroke="transparent"
           fill="none"
@@ -626,7 +648,7 @@ export default function Relationship({ data, onConnectSubtypePoint, onContextMen
           d={calcPath(
             pathData, // Use pathData which includes the field offsets
             tables[data.startTableId].width,
-            tables[data.endTableId].width
+            tables[data.endTableId].width,
           )}
           stroke="gray"
           className="group-hover:stroke-sky-700"

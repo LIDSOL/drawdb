@@ -90,7 +90,7 @@ export default function Canvas() {
     deleteRelationship,
     updateRelationship,
     setRelationships,
-    setTables,
+    deleteField,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -1389,7 +1389,6 @@ export default function Canvas() {
     handleFieldContextMenuClose();
 
     // Convert screen coordinates to canvas coordinates
-    const rect = canvasRef.current.getBoundingClientRect();
     const screenX = e.clientX;
     const screenY = e.clientY;
 
@@ -3132,8 +3131,8 @@ export default function Canvas() {
           </div>
           <p style={{ lineHeight: "1.5" }}>
             Would you like to rename the related field to{" "}
-            <strong>"{foreignKeyRenameModal.newName}"</strong> as well to
-            maintain consistency?
+            <strong>&ldquo;{foreignKeyRenameModal.newName}&rdquo;</strong> as
+            well to maintain consistency?
           </p>
         </div>
       </Modal>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   IconEdit,
   IconDeleteStroked,
@@ -47,8 +47,9 @@ export default function NoteContextMenu({
       document.addEventListener("keydown", handleEscape);
 
       // Add mouse leave event to the menu element
-      if (menuRef.current) {
-        menuRef.current.addEventListener("mouseleave", handleMouseLeave);
+      const currentMenuRef = menuRef.current;
+      if (currentMenuRef) {
+        currentMenuRef.addEventListener("mouseleave", handleMouseLeave);
       }
     }, 100);
 
@@ -58,8 +59,9 @@ export default function NoteContextMenu({
       document.removeEventListener("keydown", handleEscape);
 
       // Clean up mouse leave event
-      if (menuRef.current) {
-        menuRef.current.removeEventListener("mouseleave", handleMouseLeave);
+      const currentMenuRef = menuRef.current;
+      if (currentMenuRef) {
+        currentMenuRef.removeEventListener("mouseleave", handleMouseLeave);
       }
     };
   }, [visible, onClose]);

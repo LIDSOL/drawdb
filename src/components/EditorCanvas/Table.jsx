@@ -203,7 +203,6 @@ export default function Table(props) {
       const isFieldArea = e.target.closest('[data-field-area="true"]');
 
       if (!isFieldArea) {
-        const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX;
         const y = e.clientY;
 
@@ -581,7 +580,6 @@ export default function Table(props) {
           if (onFieldContextMenu) {
             e.preventDefault();
             e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
             onFieldContextMenu(
               e,
               tableData.id,
