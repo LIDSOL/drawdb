@@ -1421,7 +1421,7 @@ export default function Canvas() {
     const targetX = canvasContextMenu.diagramX;
     const targetY = canvasContextMenu.diagramY;
 
-    // Temporarily store the current transform pan values
+    // Store the current transform pan values for restoration
     const originalPan = { ...transform.pan };
 
     // Update transform to place table at right-click position
@@ -1445,7 +1445,7 @@ export default function Canvas() {
     const targetX = canvasContextMenu.diagramX;
     const targetY = canvasContextMenu.diagramY;
 
-    // Temporarily store the current transform pan values
+    // Store the current transform pan values for restoration
     const originalPan = { ...transform.pan };
 
     // Update transform to place area at right-click position
@@ -1469,7 +1469,7 @@ export default function Canvas() {
     const targetX = canvasContextMenu.diagramX;
     const targetY = canvasContextMenu.diagramY;
 
-    // Temporarily store the current transform pan values
+    // Store the current transform pan values for restoration
     const originalPan = { ...transform.pan };
 
     // Update transform to place note at right-click position
@@ -2345,12 +2345,10 @@ export default function Canvas() {
     const parentTable = tables.find((t) => t.id === linkingLine.startTableId);
 
     if (!parentTable) {
-      console.error("Parent table not found for linking.");
       setLinking(false);
       return;
     }
     if (!childTable) {
-      console.error("Child table not found for linking.");
       setLinking(false);
       return;
     }
