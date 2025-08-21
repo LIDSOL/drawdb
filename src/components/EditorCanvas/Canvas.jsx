@@ -22,6 +22,7 @@ import RelationshipContextMenu from "./RelationshipContextMenu";
 import AreaContextMenu from "./AreaContextMenu";
 import NoteContextMenu from "./NoteContextMenu";
 import CanvasContextMenu from "./CanvasContextMenu";
+import FieldContextMenu from "./FieldContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -189,6 +190,14 @@ export default function Canvas() {
     diagramY: 0,
   });
 
+  const [fieldContextMenu, setFieldContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    tableId: null,
+    fieldId: null,
+  });
+
   const [renameModal, setRenameModal] = useState({
     visible: false,
     tableId: null,
@@ -221,6 +230,9 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
+    // Close field context menu
+    handleFieldContextMenuClose();
+
     setContextMenu({
       visible: true,
       x: x,
@@ -241,6 +253,9 @@ export default function Canvas() {
   const handleRelationshipContextMenu = (e, relationshipId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Close field context menu
+    handleFieldContextMenuClose();
 
     setRelationshipContextMenu({
       visible: true,
@@ -393,6 +408,171 @@ export default function Canvas() {
   const handleDeleteTable = () => {
     if (contextMenu.tableId !== null) {
       deleteTable(contextMenu.tableId);
+    }
+  };
+
+  // Field context menu handlers
+  const handleFieldContextMenu = (e, tableId, fieldId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Close all other context menus
+    handleContextMenuClose();
+    handleRelationshipContextMenuClose();
+    handleAreaContextMenuClose();
+    handleNoteContextMenuClose();
+    handleCanvasContextMenuClose();
+
+    setFieldContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      tableId: tableId,
+      fieldId: fieldId,
+    });
+  };
+
+  const handleFieldContextMenuClose = () => {
+    setFieldContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+      fieldId: null,
+    });
+  };
+
+  const handleEditField = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: fieldContextMenu.tableId,
+          currentTab: Tab.TABLES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_table_${fieldContextMenu.tableId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: fieldContextMenu.tableId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteField = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      deleteField(fieldContextMenu.tableId, fieldContextMenu.fieldId);
+    }
+  };
+
+  const handleToggleFieldPrimaryKey = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId
+            ? {
+                ...f,
+                primary: !f.primary,
+                // When setting as primary key, ensure notNull and unique are true
+                notNull: !f.primary ? true : f.notNull,
+                unique: !f.primary ? true : f.unique,
+              }
+            : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldNotNull = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        // If trying to set a primary key as nullable, show warning and don't change
+        if (field.primary && field.notNull) {
+          Toast.info(t("pk_has_not_be_null"));
+          return;
+        }
+
+        // Primary key fields cannot be null, so don't allow setting notNull to false
+        const newNotNull = field.primary ? true : !field.notNull;
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId ? { ...f, notNull: newNotNull } : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldUnique = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        // If trying to remove unique from a primary key, show warning and don't change
+        if (field.primary && field.unique) {
+          Toast.info(t("pk_has_to_be_unique"));
+          return;
+        }
+
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId ? { ...f, unique: !f.unique } : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldAutoIncrement = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId
+            ? { ...f, increment: !f.increment }
+            : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
     }
   };
 
@@ -685,6 +865,9 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
+    // Close field context menu
+    handleFieldContextMenuClose();
+
     setAreaContextMenu({
       visible: true,
       x: x,
@@ -804,6 +987,9 @@ export default function Canvas() {
   const handleNoteContextMenu = (e, noteId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Close field context menu
+    handleFieldContextMenuClose();
 
     setNoteContextMenu({
       visible: true,
@@ -935,6 +1121,9 @@ export default function Canvas() {
   const handleCanvasContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Close field context menu
+    handleFieldContextMenuClose();
 
     // Convert screen coordinates to canvas coordinates
     const rect = canvasRef.current.getBoundingClientRect();
@@ -1220,6 +1409,10 @@ export default function Canvas() {
       handleCanvasContextMenuClose();
     }
 
+    if (fieldContextMenu.visible && e.button === 0) {
+      handleFieldContextMenuClose();
+    }
+
     if (selectedElement.open && !layout.sidebar) return;
     if (!e.isPrimary) return;
 
@@ -1459,6 +1652,10 @@ export default function Canvas() {
 
     if (canvasContextMenu.visible && e.button === 0) {
       handleCanvasContextMenuClose();
+    }
+
+    if (fieldContextMenu.visible && e.button === 0) {
+      handleFieldContextMenuClose();
     }
 
     // Handle right-click on canvas background for context menu
@@ -2207,6 +2404,7 @@ export default function Canvas() {
                   handlePointerDownOnElement(e, table.id, ObjectType.TABLE)
                 }
                 onContextMenu={handleTableContextMenu}
+                onFieldContextMenu={handleFieldContextMenu}
               />
             );
           })}
@@ -2396,6 +2594,26 @@ export default function Canvas() {
         onStartAreaSelection={handleCanvasStartAreaSelection}
         undoStack={undoStack}
         redoStack={redoStack}
+      />
+
+      <FieldContextMenu
+        visible={fieldContextMenu.visible}
+        x={fieldContextMenu.x}
+        y={fieldContextMenu.y}
+        field={
+          fieldContextMenu.tableId !== null && fieldContextMenu.fieldId !== null
+            ? tables
+                .find((t) => t.id === fieldContextMenu.tableId)
+                ?.fields.find((f) => f.id === fieldContextMenu.fieldId)
+            : null
+        }
+        onClose={handleFieldContextMenuClose}
+        onEdit={handleEditField}
+        onDelete={handleDeleteField}
+        onTogglePrimaryKey={handleToggleFieldPrimaryKey}
+        onToggleNotNull={handleToggleFieldNotNull}
+        onToggleUnique={handleToggleFieldUnique}
+        onToggleAutoIncrement={handleToggleFieldAutoIncrement}
       />
 
       <Modal

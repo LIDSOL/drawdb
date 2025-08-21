@@ -43,6 +43,7 @@ export default function Table(props) {
     setLinkingLine,
     moving,
     onContextMenu,
+    onFieldContextMenu,
   } = props;
   const { layout } = useLayout();
   const { deleteTable, deleteField } = useDiagram();
@@ -575,6 +576,20 @@ export default function Table(props) {
           // Required for onPointerLeave to trigger when a touch pointer leaves
           // https://stackoverflow.com/a/70976017/1137077
           e.target.releasePointerCapture(e.pointerId);
+        }}
+        onContextMenu={(e) => {
+          if (onFieldContextMenu) {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            onFieldContextMenu(
+              e,
+              tableData.id,
+              fieldData.id,
+              e.clientX,
+              e.clientY,
+            );
+          }
         }}
       >
         <div
