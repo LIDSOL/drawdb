@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { IconUndo, IconRedo } from "@douyinfe/semi-icons";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks";
@@ -25,8 +25,10 @@ export default function CanvasContextMenu({
   useEffect(() => {
     if (!visible) return;
 
+    const currentMenuRef = menuRef.current;
+
     const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+      if (currentMenuRef && !currentMenuRef.contains(e.target)) {
         onClose();
       }
     };
@@ -46,8 +48,8 @@ export default function CanvasContextMenu({
       document.addEventListener("keydown", handleEscape);
 
       // Add mouse leave event to the menu element
-      if (menuRef.current) {
-        menuRef.current.addEventListener("mouseleave", handleMouseLeave);
+      if (currentMenuRef) {
+        currentMenuRef.addEventListener("mouseleave", handleMouseLeave);
       }
     }, 100);
 
@@ -57,8 +59,8 @@ export default function CanvasContextMenu({
       document.removeEventListener("keydown", handleEscape);
 
       // Clean up mouse leave event
-      if (menuRef.current) {
-        menuRef.current.removeEventListener("mouseleave", handleMouseLeave);
+      if (currentMenuRef) {
+        currentMenuRef.removeEventListener("mouseleave", handleMouseLeave);
       }
     };
   }, [visible, onClose]);
