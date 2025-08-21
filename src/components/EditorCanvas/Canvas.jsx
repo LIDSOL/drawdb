@@ -227,6 +227,65 @@ export default function Canvas() {
     newName: "",
   });
 
+  const [fieldRenameModal, setFieldRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [foreignKeyRenameModal, setForeignKeyRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    newName: "",
+    relatedField: null, // { tableId, fieldId, tableName, fieldName }
+  });
+
+  const fieldRenameInputRef = useRef(null);
+  const tableRenameInputRef = useRef(null);
+  const relationshipRenameInputRef = useRef(null);
+
+  // Auto-select text when field rename modal opens
+  useEffect(() => {
+    if (fieldRenameModal.visible && fieldRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (fieldRenameInputRef.current) {
+          fieldRenameInputRef.current.focus();
+          fieldRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [fieldRenameModal.visible]);
+
+  // Auto-select text when table rename modal opens
+  useEffect(() => {
+    if (renameModal.visible && tableRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (tableRenameInputRef.current) {
+          tableRenameInputRef.current.focus();
+          tableRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [renameModal.visible]);
+
+  // Auto-select text when relationship rename modal opens
+  useEffect(() => {
+    if (relationshipRenameModal.visible && relationshipRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (relationshipRenameInputRef.current) {
+          relationshipRenameInputRef.current.focus();
+          relationshipRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [relationshipRenameModal.visible]);
+
   const handleTableContextMenu = (e, tableId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1068,6 +1127,209 @@ export default function Canvas() {
     setNoteRenameModal({
       visible: false,
       noteId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleFieldRename = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+
+      if (field) {
+        setFieldRenameModal({
+          visible: true,
+          tableId: fieldContextMenu.tableId,
+          fieldId: fieldContextMenu.fieldId,
+          currentName: field.name,
+          newName: field.name,
+        });
+      }
+    }
+    handleFieldContextMenuClose();
+  };
+
+  const handleFieldRenameConfirm = () => {
+    if (
+      fieldRenameModal.tableId !== null &&
+      fieldRenameModal.fieldId !== null &&
+      fieldRenameModal.newName.trim()
+    ) {
+      // Check if this field is part of a foreign key relationship
+      const relatedField = findRelatedForeignKeyField(
+        fieldRenameModal.tableId,
+        fieldRenameModal.fieldId,
+      );
+
+      if (relatedField) {
+        // Show foreign key confirmation modal
+        setForeignKeyRenameModal({
+          visible: true,
+          tableId: fieldRenameModal.tableId,
+          fieldId: fieldRenameModal.fieldId,
+          newName: fieldRenameModal.newName.trim(),
+          relatedField: relatedField,
+        });
+        setFieldRenameModal({
+          visible: false,
+          tableId: null,
+          fieldId: null,
+          currentName: "",
+          newName: "",
+        });
+      } else {
+        // No foreign key relationship, rename directly
+        renameFieldOnly(
+          fieldRenameModal.tableId,
+          fieldRenameModal.fieldId,
+          fieldRenameModal.newName.trim(),
+        );
+        setFieldRenameModal({
+          visible: false,
+          tableId: null,
+          fieldId: null,
+          currentName: "",
+          newName: "",
+        });
+        Toast.success("Field renamed successfully!");
+      }
+    }
+  };
+
+  const findRelatedForeignKeyField = (tableId, fieldId) => {
+    for (const relationship of relationships) {
+      // Check if this field is the foreign key (start field)
+      if (
+        relationship.startTableId === tableId &&
+        relationship.startFieldId === fieldId
+      ) {
+        const relatedTable = tables.find(
+          (t) => t.id === relationship.endTableId,
+        );
+        const relatedField = relatedTable?.fields.find(
+          (f) => f.id === relationship.endFieldId,
+        );
+        if (relatedTable && relatedField) {
+          return {
+            tableId: relationship.endTableId,
+            fieldId: relationship.endFieldId,
+            tableName: relatedTable.name,
+            fieldName: relatedField.name,
+          };
+        }
+      }
+      // Check if this field is the referenced field (end field)
+      if (
+        relationship.endTableId === tableId &&
+        relationship.endFieldId === fieldId
+      ) {
+        const relatedTable = tables.find(
+          (t) => t.id === relationship.startTableId,
+        );
+        const relatedField = relatedTable?.fields.find(
+          (f) => f.id === relationship.startFieldId,
+        );
+        if (relatedTable && relatedField) {
+          return {
+            tableId: relationship.startTableId,
+            fieldId: relationship.startFieldId,
+            tableName: relatedTable.name,
+            fieldName: relatedField.name,
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const renameFieldOnly = (tableId, fieldId, newName) => {
+    const table = tables.find((t) => t.id === tableId);
+    if (table) {
+      const updatedFields = table.fields.map((f) =>
+        f.id === fieldId ? { ...f, name: newName } : f,
+      );
+      updateTable(tableId, { fields: updatedFields });
+    }
+  };
+
+  const renameBothFields = (
+    tableId,
+    fieldId,
+    newName,
+    relatedTableId,
+    relatedFieldId,
+  ) => {
+    // Rename the original field
+    renameFieldOnly(tableId, fieldId, newName);
+    // Rename the related field
+    renameFieldOnly(relatedTableId, relatedFieldId, newName);
+  };
+
+  const handleForeignKeyRenameYes = () => {
+    if (
+      foreignKeyRenameModal.tableId !== null &&
+      foreignKeyRenameModal.fieldId !== null
+    ) {
+      renameBothFields(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+        foreignKeyRenameModal.relatedField.tableId,
+        foreignKeyRenameModal.relatedField.fieldId,
+      );
+      setForeignKeyRenameModal({
+        visible: false,
+        tableId: null,
+        fieldId: null,
+        newName: "",
+        relatedField: null,
+      });
+      Toast.success("Both fields renamed successfully!");
+    }
+  };
+
+  const handleForeignKeyRenameNo = () => {
+    if (
+      foreignKeyRenameModal.tableId !== null &&
+      foreignKeyRenameModal.fieldId !== null
+    ) {
+      renameFieldOnly(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+      );
+      setForeignKeyRenameModal({
+        visible: false,
+        tableId: null,
+        fieldId: null,
+        newName: "",
+        relatedField: null,
+      });
+      Toast.success("Field renamed successfully!");
+    }
+  };
+
+  const handleForeignKeyRenameCancel = () => {
+    setForeignKeyRenameModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      newName: "",
+      relatedField: null,
+    });
+  };
+
+  const handleFieldRenameCancel = () => {
+    setFieldRenameModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
       currentName: "",
       newName: "",
     });
@@ -2635,6 +2897,7 @@ export default function Canvas() {
         }
         onClose={handleFieldContextMenuClose}
         onEdit={handleEditField}
+        onRename={handleFieldRename}
         onDelete={handleDeleteField}
         onTogglePrimaryKey={handleToggleFieldPrimaryKey}
         onToggleNotNull={handleToggleFieldNotNull}
@@ -2661,6 +2924,7 @@ export default function Canvas() {
             {t("name")}:
           </label>
           <Input
+            ref={tableRenameInputRef}
             value={renameModal.newName}
             onChange={(value) =>
               setRenameModal((prev) => ({
@@ -2669,7 +2933,6 @@ export default function Canvas() {
               }))
             }
             placeholder={t("name")}
-            autoFocus
             onEnterPress={handleRenameConfirm}
           />
         </div>
@@ -2694,6 +2957,7 @@ export default function Canvas() {
             {t("name")}:
           </label>
           <Input
+            ref={relationshipRenameInputRef}
             value={relationshipRenameModal.newName}
             onChange={(value) =>
               setRelationshipRenameModal((prev) => ({
@@ -2702,7 +2966,6 @@ export default function Canvas() {
               }))
             }
             placeholder={t("name")}
-            autoFocus
             onEnterPress={handleRelationshipRenameConfirm}
           />
         </div>
@@ -2771,6 +3034,109 @@ export default function Canvas() {
             autoFocus
             onEnterPress={handleNoteRenameConfirm}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Field"}
+        visible={fieldRenameModal.visible}
+        onOk={handleFieldRenameConfirm}
+        onCancel={handleFieldRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+        maskClosable={false}
+        keyboard={false}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            ref={fieldRenameInputRef}
+            value={fieldRenameModal.newName}
+            onChange={(value) =>
+              setFieldRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            onEnterPress={(e) => {
+              e?.preventDefault();
+              e?.stopPropagation();
+              handleFieldRenameConfirm();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleFieldRenameConfirm();
+              }
+            }}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title="Foreign Key Relationship Detected"
+        visible={foreignKeyRenameModal.visible}
+        onOk={handleForeignKeyRenameYes}
+        onCancel={handleForeignKeyRenameCancel}
+        okText="Yes, rename both"
+        cancelText="Cancel"
+        width={600}
+        footer={[
+          <button
+            key="cancel"
+            className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            onClick={handleForeignKeyRenameCancel}
+          >
+            Cancel
+          </button>,
+          <button
+            key="no"
+            className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={handleForeignKeyRenameNo}
+          >
+            No, rename only this field
+          </button>,
+          <button
+            key="yes"
+            className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+            onClick={handleForeignKeyRenameYes}
+          >
+            Yes, rename both fields
+          </button>,
+        ]}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <p style={{ marginBottom: "16px", lineHeight: "1.5" }}>
+            This field is part of a foreign key relationship with:
+          </p>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#f5f5f5",
+              borderRadius: "4px",
+              marginBottom: "16px",
+            }}
+          >
+            <strong>
+              {foreignKeyRenameModal.relatedField?.tableName}.
+              {foreignKeyRenameModal.relatedField?.fieldName}
+            </strong>
+          </div>
+          <p style={{ lineHeight: "1.5" }}>
+            Would you like to rename the related field to{" "}
+            <strong>"{foreignKeyRenameModal.newName}"</strong> as well to
+            maintain consistency?
+          </p>
         </div>
       </Modal>
     </div>
