@@ -18,6 +18,7 @@ export default function FieldContextMenu({
   field,
   onClose,
   onEdit,
+  onRename,
   onDelete,
   onTogglePrimaryKey,
   onToggleNotNull,
@@ -67,6 +68,14 @@ export default function FieldContextMenu({
       icon: <IconEdit />,
       onClick: () => {
         onEdit();
+        onClose();
+      },
+    },
+    {
+      label: t("rename") || "Rename Field",
+      icon: <IconEdit2Stroked />,
+      onClick: () => {
+        onRename();
         onClose();
       },
     },
