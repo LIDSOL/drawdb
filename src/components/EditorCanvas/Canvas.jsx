@@ -57,6 +57,7 @@ export default function Canvas() {
   }, [location, navigate, setTransform]);
 
   const [isAreaSelecting, setIsAreaSelecting] = useState(false);
+  const [isDrawingSelectionArea, setIsDrawingSelectionArea] = useState(false);
   const [selectionArea, setSelectionArea] = useState({
     startX: 0,
     startY: 0,
@@ -1368,16 +1369,9 @@ export default function Canvas() {
   };
 
   const handleCanvasStartAreaSelection = () => {
-    // Start area selection mode
+    // Start area selection mode - wait for user to click and drag
     setIsAreaSelecting(true);
-    setSelectionArea({
-      startX: canvasContextMenu.diagramX,
-      startY: canvasContextMenu.diagramY,
-      x: canvasContextMenu.diagramX,
-      y: canvasContextMenu.diagramY,
-      width: 0,
-      height: 0,
-    });
+    setIsDrawingSelectionArea(false);
 
     // Change pointer style to indicate selection mode
     pointer.setStyle("crosshair");
@@ -1509,7 +1503,7 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
-    if (isAreaSelecting) {
+    if (isAreaSelecting && isDrawingSelectionArea) {
       const currentX = pointer.spaces.diagram.x;
       const currentY = pointer.spaces.diagram.y;
       setSelectionArea((prev) => ({
@@ -1519,7 +1513,6 @@ export default function Canvas() {
         width: Math.abs(currentX - prev.startX),
         height: Math.abs(currentY - prev.startY),
       }));
-      // Only update the area, without finalizing it yet.
       return;
     }
 
@@ -1686,6 +1679,20 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
+    // If in area selection mode, start drawing the selection area
+    if (isAreaSelecting && !isDrawingSelectionArea && e.button === 0) {
+      setIsDrawingSelectionArea(true);
+      setSelectionArea({
+        startX: pointer.spaces.diagram.x,
+        startY: pointer.spaces.diagram.y,
+        x: pointer.spaces.diagram.x,
+        y: pointer.spaces.diagram.y,
+        width: 0,
+        height: 0,
+      });
+      return;
+    }
+
     // If pressing Alt + left click, start area selection
     if (e.altKey && e.button === 0) {
       setIsAreaSelecting(true);
@@ -1697,6 +1704,13 @@ export default function Canvas() {
         width: 0,
         height: 0,
       });
+      return;
+    }
+
+    // Cancel area selection if clicking without being in drawing mode
+    if (isAreaSelecting && !isDrawingSelectionArea && e.button === 0) {
+      setIsAreaSelecting(false);
+      pointer.setStyle("default");
       return;
     }
 
@@ -1867,7 +1881,7 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
-    if (isAreaSelecting) {
+    if (isAreaSelecting && isDrawingSelectionArea) {
       const areaBBox = selectionArea;
       // Select tables that intersect the selection area (any part of table)
       const selectedTables = tables.filter((table) => {
@@ -1906,13 +1920,25 @@ export default function Canvas() {
           id: selectedTables.map((t) => t.id),
           open: false,
         });
+
+        // Set up dragging state for the selected tables
+        setDragging({
+          element: ObjectType.TABLE,
+          id: selectedTables.map((t) => t.id),
+          prevX: selectedTables[0].x, // Use first table as reference
+          prevY: selectedTables[0].y,
+        });
+
         // set start point for dragging
         setDragStart({
           x: pointer.spaces.diagram.x,
           y: pointer.spaces.diagram.y,
         });
       }
+      // Reset area selection states and restore pointer style
       setIsAreaSelecting(false);
+      setIsDrawingSelectionArea(false);
+      pointer.setStyle("default");
       return;
     }
 
@@ -2410,7 +2436,7 @@ export default function Canvas() {
           })}
           {
             /*Draw the selection areas*/
-            isAreaSelecting && (
+            isAreaSelecting && isDrawingSelectionArea && (
               <rect
                 x={selectionArea.x}
                 y={selectionArea.y}
