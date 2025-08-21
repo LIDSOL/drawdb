@@ -1269,6 +1269,128 @@ export default function Canvas() {
     renameFieldOnly(tableId, fieldId, newName);
     // Rename the related field
     renameFieldOnly(relatedTableId, relatedFieldId, newName);
+
+    // Update relationship names to default when foreign key fields are renamed
+    updateRelationshipNamesAfterFieldRename(
+      tableId,
+      fieldId,
+      newName,
+      relatedTableId,
+      relatedFieldId,
+      newName,
+    );
+  };
+
+  const updateRelationshipNamesAfterFieldRename = (
+    tableId,
+    fieldId,
+    newFieldName,
+    relatedTableId,
+    relatedFieldId,
+    relatedNewFieldName,
+  ) => {
+    // Find relationships that involve these fields
+    const relatedRelationships = relationships.filter(
+      (r) =>
+        (r.startTableId === tableId && r.startFieldId === fieldId) ||
+        (r.endTableId === tableId && r.endFieldId === fieldId) ||
+        (r.startTableId === relatedTableId &&
+          r.startFieldId === relatedFieldId) ||
+        (r.endTableId === relatedTableId && r.endFieldId === relatedFieldId),
+    );
+
+    // Update each relationship with a new default name
+    relatedRelationships.forEach((relationship) => {
+      const startTable = tables.find((t) => t.id === relationship.startTableId);
+      const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+      if (startTable && endTable) {
+        // Determine the field name to use based on which field was renamed
+        let endFieldName, startTableName, endTableName;
+
+        if (
+          relationship.endTableId === tableId &&
+          relationship.endFieldId === fieldId
+        ) {
+          // The end field was renamed
+          endFieldName = newFieldName;
+        } else if (
+          relationship.endTableId === relatedTableId &&
+          relationship.endFieldId === relatedFieldId
+        ) {
+          // The related end field was renamed
+          endFieldName = relatedNewFieldName;
+        } else {
+          // Use current field name
+          const endField = endTable.fields?.find(
+            (f) => f.id === relationship.endFieldId,
+          );
+          endFieldName = endField?.name;
+        }
+
+        startTableName = startTable.name;
+        endTableName = endTable.name;
+
+        if (endFieldName && startTableName && endTableName) {
+          const defaultName = `fk_${endTableName}_${endFieldName}_${startTableName}`;
+
+          // Only update if the name is different
+          if (relationship.name !== defaultName) {
+            updateRelationship(relationship.id, { name: defaultName });
+          }
+        }
+      }
+    });
+  };
+
+  const updateRelationshipNamesAfterSingleFieldRename = (
+    tableId,
+    fieldId,
+    newFieldName,
+  ) => {
+    // Find relationships that involve this field
+    const relatedRelationships = relationships.filter(
+      (r) =>
+        (r.startTableId === tableId && r.startFieldId === fieldId) ||
+        (r.endTableId === tableId && r.endFieldId === fieldId),
+    );
+
+    // Update each relationship with a new default name
+    relatedRelationships.forEach((relationship) => {
+      const startTable = tables.find((t) => t.id === relationship.startTableId);
+      const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+      if (startTable && endTable) {
+        // Determine the field name to use
+        let endFieldName, startTableName, endTableName;
+
+        if (
+          relationship.endTableId === tableId &&
+          relationship.endFieldId === fieldId
+        ) {
+          // The end field was renamed
+          endFieldName = newFieldName;
+        } else {
+          // Use current field name
+          const endField = endTable.fields?.find(
+            (f) => f.id === relationship.endFieldId,
+          );
+          endFieldName = endField?.name;
+        }
+
+        startTableName = startTable.name;
+        endTableName = endTable.name;
+
+        if (endFieldName && startTableName && endTableName) {
+          const defaultName = `fk_${endTableName}_${endFieldName}_${startTableName}`;
+
+          // Only update if the name is different
+          if (relationship.name !== defaultName) {
+            updateRelationship(relationship.id, { name: defaultName });
+          }
+        }
+      }
+    });
   };
 
   const handleForeignKeyRenameYes = () => {
@@ -1304,6 +1426,14 @@ export default function Canvas() {
         foreignKeyRenameModal.fieldId,
         foreignKeyRenameModal.newName,
       );
+
+      // Update relationship names when only one field is renamed
+      updateRelationshipNamesAfterSingleFieldRename(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+      );
+
       setForeignKeyRenameModal({
         visible: false,
         tableId: null,
@@ -3119,12 +3249,17 @@ export default function Canvas() {
           <div
             style={{
               padding: "12px",
-              backgroundColor: "#f5f5f5",
+              backgroundColor:
+                settings.mode === "light" ? "#f5f5f5" : "#374151",
               borderRadius: "4px",
               marginBottom: "16px",
             }}
           >
-            <strong>
+            <strong
+              style={{
+                color: settings.mode === "light" ? "#1f2937" : "#f9fafb",
+              }}
+            >
               {foreignKeyRenameModal.relatedField?.tableName}.
               {foreignKeyRenameModal.relatedField?.fieldName}
             </strong>
