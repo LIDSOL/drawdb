@@ -21,6 +21,7 @@ import TableContextMenu from "./TableContextMenu";
 import RelationshipContextMenu from "./RelationshipContextMenu";
 import AreaContextMenu from "./AreaContextMenu";
 import NoteContextMenu from "./NoteContextMenu";
+import CanvasContextMenu from "./CanvasContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -76,12 +77,24 @@ export default function Canvas() {
     pointer,
   } = canvasContextValue;
 
-  const { tables, updateTable, relationships, addRelationship, deleteTable, addChildToSubtype, deleteRelationship, updateRelationship, setRelationships, setTables } = useDiagram();
-  const { areas, updateArea, deleteArea } = useAreas();
-  const { notes, updateNote, deleteNote } = useNotes();
+  const {
+    tables,
+    updateTable,
+    relationships,
+    addRelationship,
+    addTable,
+    deleteTable,
+    addChildToSubtype,
+    deleteRelationship,
+    updateRelationship,
+    setRelationships,
+    setTables,
+  } = useDiagram();
+  const { areas, updateArea, addArea, deleteArea } = useAreas();
+  const { notes, updateNote, addNote, deleteNote } = useNotes();
   const { layout } = useLayout();
   const { settings } = useSettings();
-  const { setRedoStack, pushUndo } = useUndoRedo();
+  const { undoStack, redoStack, setRedoStack, setUndoStack, pushUndo } = useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
   const [dragging, setDragging] = useState({
@@ -166,6 +179,14 @@ export default function Canvas() {
     x: 0,
     y: 0,
     noteId: null,
+  });
+
+  const [canvasContextMenu, setCanvasContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    diagramX: 0,
+    diagramY: 0,
   });
 
   const [renameModal, setRenameModal] = useState({
@@ -910,6 +931,269 @@ export default function Canvas() {
     }
   };
 
+  // Canvas context menu handlers
+  const handleCanvasContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Convert screen coordinates to canvas coordinates
+    const rect = canvasRef.current.getBoundingClientRect();
+    const screenX = e.clientX;
+    const screenY = e.clientY;
+
+    // Store diagram coordinates at the time of right-click
+    const diagramX = pointer.spaces.diagram.x;
+    const diagramY = pointer.spaces.diagram.y;
+
+    setCanvasContextMenu({
+      visible: true,
+      x: screenX,
+      y: screenY,
+      diagramX: diagramX,
+      diagramY: diagramY,
+    });
+  };
+
+  const handleCanvasContextMenuClose = () => {
+    setCanvasContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      diagramX: 0,
+      diagramY: 0,
+    });
+  };
+
+  const handleCanvasAddTable = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Temporarily store the current transform pan values
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place table at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the table (it will use the updated transform.pan values)
+    addTable();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasAddArea = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Temporarily store the current transform pan values
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place area at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the area (it will use the updated transform.pan values)
+    addArea();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasAddNote = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Temporarily store the current transform pan values
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place note at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the note (it will use the updated transform.pan values)
+    addNote();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasUndo = () => {
+    // Simplified undo logic - for basic operations
+    if (undoStack.length === 0) return;
+    const a = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.filter((_, i) => i !== prev.length - 1));
+
+    if (a.action === Action.ADD) {
+      if (a.element === ObjectType.TABLE) {
+        const tableIdToDelete =
+          tables.length > 0 ? tables[tables.length - 1].id : null;
+        if (tableIdToDelete !== null) {
+          deleteTable(tableIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.AREA) {
+        const areaIdToDelete = areas.length > 0 ? areas.length - 1 : null;
+        if (areaIdToDelete !== null) {
+          deleteArea(areaIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.NOTE) {
+        const noteIdToDelete = notes.length > 0 ? notes.length - 1 : null;
+        if (noteIdToDelete !== null) {
+          deleteNote(noteIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.RELATIONSHIP) {
+        const relationshipIdToDelete =
+          relationships.length > 0 ? relationships.length - 1 : null;
+        if (relationshipIdToDelete !== null) {
+          deleteRelationship(relationshipIdToDelete, false);
+        }
+      }
+      setRedoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.EDIT) {
+      if (a.element === ObjectType.AREA && a.aid !== undefined) {
+        updateArea(a.aid, a.undo);
+      } else if (a.element === ObjectType.NOTE && a.nid !== undefined) {
+        updateNote(a.nid, a.undo);
+      } else if (a.element === ObjectType.TABLE && a.tid !== undefined) {
+        updateTable(a.tid, a.undo);
+      } else if (a.element === ObjectType.RELATIONSHIP && a.rid !== undefined) {
+        updateRelationship(a.rid, a.undo, false);
+      }
+      setRedoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.MOVE) {
+      // Handle MOVE operations
+      if (Array.isArray(a.id)) {
+        // Multiple element move
+        if (a.initialPositions) {
+          Object.entries(a.initialPositions).forEach(([id, pos]) => {
+            const elementId = parseInt(id);
+            if (a.element === ObjectType.TABLE) {
+              updateTable(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.AREA) {
+              updateArea(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.NOTE) {
+              updateNote(elementId, { x: pos.x, y: pos.y });
+            }
+          });
+        }
+      } else {
+        // Single element move
+        if (a.from) {
+          if (a.element === ObjectType.TABLE) {
+            updateTable(a.id, { x: a.from.x, y: a.from.y });
+          } else if (a.element === ObjectType.AREA) {
+            updateArea(a.id, { x: a.from.x, y: a.from.y });
+          } else if (a.element === ObjectType.NOTE) {
+            updateNote(a.id, { x: a.from.x, y: a.from.y });
+          }
+        }
+      }
+      setRedoStack((prev) => [...prev, a]);
+    }
+  };
+
+  const handleCanvasRedo = () => {
+    // Simplified redo logic - for basic operations
+    if (redoStack.length === 0) return;
+    const a = redoStack[redoStack.length - 1];
+    setRedoStack((prev) => prev.filter((_, i) => i !== prev.length - 1));
+
+    if (a.action === Action.ADD) {
+      if (a.element === ObjectType.TABLE) {
+        addTable();
+      } else if (a.element === ObjectType.AREA) {
+        addArea();
+      } else if (a.element === ObjectType.NOTE) {
+        addNote();
+      } else if (a.element === ObjectType.RELATIONSHIP) {
+        // For relationship redo, we need the relationship data
+        if (a.data && a.data.relationship) {
+          addRelationship(
+            a.data.relationship,
+            a.data.autoGeneratedFkFields,
+            a.data.childTableIdWithGeneratedFks,
+            false,
+          );
+        }
+      }
+      setUndoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.EDIT) {
+      if (a.element === ObjectType.AREA && a.aid !== undefined) {
+        updateArea(a.aid, a.redo);
+      } else if (a.element === ObjectType.NOTE && a.nid !== undefined) {
+        updateNote(a.nid, a.redo);
+      } else if (a.element === ObjectType.TABLE && a.tid !== undefined) {
+        updateTable(a.tid, a.redo);
+      } else if (a.element === ObjectType.RELATIONSHIP && a.rid !== undefined) {
+        updateRelationship(a.rid, a.redo, false);
+      }
+      setUndoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.MOVE) {
+      // Handle MOVE operations for redo
+      if (Array.isArray(a.id)) {
+        // Multiple element move
+        if (a.finalPositions) {
+          Object.entries(a.finalPositions).forEach(([id, pos]) => {
+            const elementId = parseInt(id);
+            if (a.element === ObjectType.TABLE) {
+              updateTable(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.AREA) {
+              updateArea(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.NOTE) {
+              updateNote(elementId, { x: pos.x, y: pos.y });
+            }
+          });
+        }
+      } else {
+        // Single element move
+        if (a.to) {
+          if (a.element === ObjectType.TABLE) {
+            updateTable(a.id, { x: a.to.x, y: a.to.y });
+          } else if (a.element === ObjectType.AREA) {
+            updateArea(a.id, { x: a.to.x, y: a.to.y });
+          } else if (a.element === ObjectType.NOTE) {
+            updateNote(a.id, { x: a.to.x, y: a.to.y });
+          }
+        }
+      }
+      setUndoStack((prev) => [...prev, a]);
+    }
+  };
+
+  const handleCanvasStartAreaSelection = () => {
+    // Start area selection mode
+    setIsAreaSelecting(true);
+    setSelectionArea({
+      startX: canvasContextMenu.diagramX,
+      startY: canvasContextMenu.diagramY,
+      x: canvasContextMenu.diagramX,
+      y: canvasContextMenu.diagramY,
+      width: 0,
+      height: 0,
+    });
+
+    // Change pointer style to indicate selection mode
+    pointer.setStyle("crosshair");
+  };
+
   /**
    * @param {PointerEvent} e
    * @param {*} id
@@ -930,6 +1214,10 @@ export default function Canvas() {
 
     if (noteContextMenu.visible && e.button === 0) {
       handleNoteContextMenuClose();
+    }
+
+    if (canvasContextMenu.visible && e.button === 0) {
+      handleCanvasContextMenuClose();
     }
 
     if (selectedElement.open && !layout.sidebar) return;
@@ -1159,6 +1447,24 @@ export default function Canvas() {
 
     if (relationshipContextMenu.visible && e.button === 0) {
       handleRelationshipContextMenuClose();
+    }
+
+    if (areaContextMenu.visible && e.button === 0) {
+      handleAreaContextMenuClose();
+    }
+
+    if (noteContextMenu.visible && e.button === 0) {
+      handleNoteContextMenuClose();
+    }
+
+    if (canvasContextMenu.visible && e.button === 0) {
+      handleCanvasContextMenuClose();
+    }
+
+    // Handle right-click on canvas background for context menu
+    if (e.button === 2 && e.target.id === "diagram") {
+      handleCanvasContextMenu(e);
+      return;
     }
 
     if (e.isPrimary && e.target.id === "diagram") {
@@ -1835,6 +2141,7 @@ export default function Canvas() {
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
+          onContextMenu={handleCanvasContextMenu}
           className="absolute w-full h-full touch-none"
           viewBox={`${viewBox.left} ${viewBox.top} ${viewBox.width} ${viewBox.height}`}
         >
@@ -2074,6 +2381,21 @@ export default function Canvas() {
         onRename={handleRenameNote}
         onEditContent={handleEditNoteContent}
         onChangeColor={handleNoteChangeColor}
+      />
+
+      <CanvasContextMenu
+        visible={canvasContextMenu.visible}
+        x={canvasContextMenu.x}
+        y={canvasContextMenu.y}
+        onClose={handleCanvasContextMenuClose}
+        onAddTable={handleCanvasAddTable}
+        onAddArea={handleCanvasAddArea}
+        onAddNote={handleCanvasAddNote}
+        onUndo={handleCanvasUndo}
+        onRedo={handleCanvasRedo}
+        onStartAreaSelection={handleCanvasStartAreaSelection}
+        undoStack={undoStack}
+        redoStack={redoStack}
       />
 
       <Modal
