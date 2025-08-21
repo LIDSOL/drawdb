@@ -25,8 +25,10 @@ export default function TableContextMenu({
   useEffect(() => {
     if (!visible) return;
 
+    const currentMenuRef = menuRef.current;
+
     const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+      if (currentMenuRef && !currentMenuRef.contains(e.target)) {
         onClose();
       }
     };
@@ -46,7 +48,6 @@ export default function TableContextMenu({
       document.addEventListener("keydown", handleEscape);
 
       // Add mouse leave event to the menu element
-      const currentMenuRef = menuRef.current;
       if (currentMenuRef) {
         currentMenuRef.addEventListener("mouseleave", handleMouseLeave);
       }
@@ -58,7 +59,6 @@ export default function TableContextMenu({
       document.removeEventListener("keydown", handleEscape);
 
       // Clean up mouse leave event
-      const currentMenuRef = menuRef.current;
       if (currentMenuRef) {
         currentMenuRef.removeEventListener("mouseleave", handleMouseLeave);
       }
