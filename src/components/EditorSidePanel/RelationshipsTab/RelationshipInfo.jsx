@@ -11,6 +11,7 @@ import {
   IconDeleteStroked,
   IconLoopTextStroked,
   IconMore,
+  IconRefresh,
 } from "@douyinfe/semi-icons";
 import {
   RelationshipType,
@@ -20,7 +21,7 @@ import {
   ObjectType,
   Notation,
 } from "../../../data/constants";
-import { useDiagram, useUndoRedo} from "../../../hooks";
+import { useDiagram, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -38,31 +39,84 @@ const columns = [
 
 export default function RelationshipInfo({ data }) {
   const { setUndoStack, setRedoStack } = useUndoRedo();
-  const { tables, setTables, setRelationships, deleteRelationship, updateRelationship } =
-    useDiagram();
+  const {
+    tables,
+    setTables,
+    setRelationships,
+    deleteRelationship,
+    updateRelationship,
+  } = useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
   const { settings } = useSettings();
 
+  const isDefaultRelationshipName = (relationship, tables) => {
+    if (!relationship || !tables) return false;
+
+    const startTable = tables.find((t) => t.id === relationship.startTableId);
+    const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+    if (!startTable || !endTable) return false;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === relationship.startFieldId,
+    );
+    const endField = endTable.fields?.find(
+      (f) => f.id === relationship.endFieldId,
+    );
+
+    if (!startField || !endField) return false;
+
+    // Check if it matches the original creation pattern: parentTable_parentField
+    const originalPattern = `${startTable.name}_${startField.name}`;
+
+    // Check if it matches the fk pattern: fk_endTable_endField_startTable
+    const fkPattern = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    return (
+      relationship.name === originalPattern || relationship.name === fkPattern
+    );
+  };
+
   const swapKeys = () => {
+    const shouldUpdateName = isDefaultRelationshipName(data, tables);
+
+    const undoData = {
+      startTableId: data.startTableId,
+      startFieldId: data.startFieldId,
+      endTableId: data.endTableId,
+      endFieldId: data.endFieldId,
+    };
+
+    const redoData = {
+      startTableId: data.endTableId,
+      startFieldId: data.endFieldId,
+      endTableId: data.startTableId,
+      endFieldId: data.startFieldId,
+    };
+
+    if (shouldUpdateName) {
+      undoData.name = data.name;
+      // Generate the new name after swapping
+      const newStartTable = tables.find((t) => t.id === data.endTableId);
+      const newEndTable = tables.find((t) => t.id === data.startTableId);
+      const newEndField = newEndTable?.fields?.find(
+        (f) => f.id === data.startFieldId,
+      );
+
+      if (newStartTable && newEndTable && newEndField) {
+        redoData.name = `fk_${newEndTable.name}_${newEndField.name}_${newStartTable.name}`;
+      }
+    }
+
     setUndoStack((prev) => [
       ...prev,
       {
         action: Action.EDIT,
         element: ObjectType.RELATIONSHIP,
         rid: data.id,
-        undo: {
-          startTableId: data.startTableId,
-          startFieldId: data.startFieldId,
-          endTableId: data.endTableId,
-          endFieldId: data.endFieldId,
-        },
-        redo: {
-          startTableId: data.endTableId,
-          startFieldId: data.endFieldId,
-          endTableId: data.startTableId,
-          endFieldId: data.startFieldId,
-        },
+        undo: undoData,
+        redo: redoData,
         message: t("edit_relationship", {
           refName: data.name,
           extra: "[swap keys]",
@@ -71,20 +125,25 @@ export default function RelationshipInfo({ data }) {
     ]);
     setRedoStack([]);
     setRelationships((prev) =>
-      prev.map((e, idx) =>
-        idx === data.id
-          ? {
-              ...e,
-              name: `fk_${tables[e.endTableId].name}_${
-                tables[e.endTableId].fields[e.endFieldId].name
-              }_${tables[e.startTableId].name}`,
-              startTableId: e.endTableId,
-              startFieldId: e.endFieldId,
-              endTableId: e.startTableId,
-              endFieldId: e.startFieldId,
-            }
-          : e,
-      ),
+      prev.map((e, idx) => {
+        if (idx === data.id) {
+          const updatedRelationship = {
+            ...e,
+            startTableId: e.endTableId,
+            startFieldId: e.endFieldId,
+            endTableId: e.startTableId,
+            endFieldId: e.startFieldId,
+          };
+
+          // Only update name if it's a default name
+          if (shouldUpdateName && redoData.name) {
+            updatedRelationship.name = redoData.name;
+          }
+
+          return updatedRelationship;
+        }
+        return e;
+      }),
     );
   };
 
@@ -183,8 +242,14 @@ export default function RelationshipInfo({ data }) {
     const isCurrentlyNullable = fkFields.every((field) => !field.notNull);
     const newNotNullValue = isCurrentlyNullable;
 
-    const undoFields = fkFields.map(field => ({ id: field.id, notNull: field.notNull }));
-    const redoFields = fkFields.map(field => ({ id: field.id, notNull: newNotNullValue }));
+    const undoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: field.notNull,
+    }));
+    const redoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: newNotNullValue,
+    }));
 
     setUndoStack((prev) => [
       ...prev,
@@ -218,6 +283,42 @@ export default function RelationshipInfo({ data }) {
         return table;
       }),
     );
+  };
+
+  const setDefaultName = () => {
+    const startTable = tables.find((t) => t.id === data.startTableId);
+    const endTable = tables.find((t) => t.id === data.endTableId);
+
+    if (!startTable || !endTable) return;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === data.startFieldId,
+    );
+    const endField = endTable.fields?.find((f) => f.id === data.endFieldId);
+
+    if (!startField || !endField) return;
+
+    const defaultName = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    if (data.name === defaultName) return; // Already has default name
+
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        component: "self",
+        rid: data.id,
+        undo: { name: data.name },
+        redo: { name: defaultName },
+        message: t("edit_relationship", {
+          refName: defaultName,
+          extra: "[set default name]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    updateRelationship(data.id, { name: defaultName });
   };
 
   return (
@@ -292,6 +393,11 @@ export default function RelationshipInfo({ data }) {
                     {t("swap")}
                   </Button>
                 </div>
+                <div className="mt-2">
+                  <Button icon={<IconRefresh />} block onClick={setDefaultName}>
+                    Set Default Name
+                  </Button>
+                </div>
               </div>
             }
             trigger="click"
@@ -330,7 +436,8 @@ export default function RelationshipInfo({ data }) {
               disabled={!data.relationshipType}
               placeholder={t("select_cardinality")}
             />
-            {(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && (
+            {(settings.notation === Notation.CROWS_FOOT ||
+              settings.notation === Notation.IDEF1X) && (
               <Button
                 icon={<IconLoopTextStroked />}
                 type="tertiary"

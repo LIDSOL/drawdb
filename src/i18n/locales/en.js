@@ -169,8 +169,11 @@ const en = {
     duplicate_field_name: "The child table already has a column with that name",
     cannot_connect: "Cannot connect, the columns have different types",
     pk_has_not_be_null: "Cannot set primary key as null",
-    cannot_fk: "Only fields that are a primary key or both not null and unique can be selected as a foreign key",
-    duplicate_relationship: "The parent field already has a relationship with this table child",
+    pk_has_to_be_unique: "Cannot remove unique from primary key",
+    cannot_fk:
+      "Only fields that are a primary key or both not null and unique can be selected as a foreign key",
+    duplicate_relationship:
+      "The parent field already has a relationship with this table child",
     copied_to_clipboard: "Copied to clipboard",
     create_new_diagram: "Create new diagram",
     cancel: "Cancel",
