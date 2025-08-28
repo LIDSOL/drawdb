@@ -39,6 +39,30 @@ import { useEventListener } from "usehooks-ts";
 import { areFieldsCompatible } from "../../utils/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const foreignKeyRenameFooter = [
+  <button
+    key="cancel"
+    className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+    onClick={handleForeignKeyRenameCancel}
+  >
+    Cancel
+  </button>,
+  <button
+    key="no"
+    className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+    onClick={handleForeignKeyRenameNo}
+  >
+    No, rename only this field
+  </button>,
+  <button
+    key="yes"
+    className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+    onClick={handleForeignKeyRenameYes}
+  >
+    Yes, rename both fields
+  </button>,
+];
+
 export default function Canvas() {
   const { t } = useTranslation();
   const { transform, setTransform } = useTransform();
@@ -385,7 +409,7 @@ export default function Canvas() {
         currentName: "",
         newName: "",
       });
-      Toast.success("Table renamed successfully!");
+      Toast.success(t("table_renamed_success"));
     }
   };
 
@@ -454,7 +478,7 @@ export default function Canvas() {
           fields: updatedFields,
         });
 
-        Toast.success("Field added successfully!");
+        Toast.success(t("field_added_success"));
 
         setSelectedElement({
           element: ObjectType.TABLE,
@@ -997,7 +1021,7 @@ export default function Canvas() {
         currentName: "",
         newName: "",
       });
-      Toast.success("Area renamed successfully!");
+      Toast.success(t("area_renamed_success"));
     }
   };
 
@@ -1119,7 +1143,7 @@ export default function Canvas() {
         currentName: "",
         newName: "",
       });
-      Toast.success("Note renamed successfully!");
+      Toast.success(t("note_renamed_success"));
     }
   };
 
@@ -1197,7 +1221,7 @@ export default function Canvas() {
           currentName: "",
           newName: "",
         });
-        Toast.success("Field renamed successfully!");
+        Toast.success(t("field_renamed_success"));
       }
     }
   };
@@ -1412,7 +1436,7 @@ export default function Canvas() {
         newName: "",
         relatedField: null,
       });
-      Toast.success("Both fields renamed successfully!");
+      Toast.success(t("both_fields_renamed_success"));
     }
   };
 
@@ -1441,7 +1465,7 @@ export default function Canvas() {
         newName: "",
         relatedField: null,
       });
-      Toast.success("Field renamed successfully!");
+      Toast.success(t("field_renamed_success"));
     }
   };
 
@@ -1774,29 +1798,20 @@ export default function Canvas() {
    * @param {ObjectType[keyof ObjectType]} type
    */
   const handlePointerDownOnElement = (e, id, type) => {
-    if (contextMenu.visible && e.button === 0) {
-      handleContextMenuClose();
+    // Unified context menu close handler
+    if (e.button === 0) {
+      closeAllContextMenus();
     }
-
-    if (relationshipContextMenu.visible && e.button === 0) {
-      handleRelationshipContextMenuClose();
-    }
-
-    if (areaContextMenu.visible && e.button === 0) {
-      handleAreaContextMenuClose();
-    }
-
-    if (noteContextMenu.visible && e.button === 0) {
-      handleNoteContextMenuClose();
-    }
-
-    if (canvasContextMenu.visible && e.button === 0) {
-      handleCanvasContextMenuClose();
-    }
-
-    if (fieldContextMenu.visible && e.button === 0) {
-      handleFieldContextMenuClose();
-    }
+    // Unified context menu close handler
+    const closeAllContextMenus = () => {
+      handleContextMenuClose && handleContextMenuClose();
+      handleRelationshipContextMenuClose &&
+        handleRelationshipContextMenuClose();
+      handleAreaContextMenuClose && handleAreaContextMenuClose();
+      handleNoteContextMenuClose && handleNoteContextMenuClose();
+      handleCanvasContextMenuClose && handleCanvasContextMenuClose();
+      handleFieldContextMenuClose && handleFieldContextMenuClose();
+    };
 
     if (selectedElement.open && !layout.sidebar) return;
     if (!e.isPrimary) return;
@@ -3218,29 +3233,7 @@ export default function Canvas() {
         okText="Yes, rename both"
         cancelText="Cancel"
         width={600}
-        footer={[
-          <button
-            key="cancel"
-            className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-            onClick={handleForeignKeyRenameCancel}
-          >
-            Cancel
-          </button>,
-          <button
-            key="no"
-            className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-            onClick={handleForeignKeyRenameNo}
-          >
-            No, rename only this field
-          </button>,
-          <button
-            key="yes"
-            className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-            onClick={handleForeignKeyRenameYes}
-          >
-            Yes, rename both fields
-          </button>,
-        ]}
+        footer={foreignKeyRenameFooter}
       >
         <div style={{ padding: "20px 0" }}>
           <p style={{ marginBottom: "16px", lineHeight: "1.5" }}>

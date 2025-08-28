@@ -301,10 +301,10 @@ export default function Table(props) {
           <div
             className={`overflow-hidden font-bold h-[40px] flex justify-between items-center border-b border-gray-400 ${
               settings.notation !== Notation.DEFAULT
-                ? "bg-transparent"
-                : settings.mode === "light"
-                  ? "bg-zinc-200"
-                  : "bg-zinc-900"
+              ? "bg-transparent"
+              : settings.mode === "light"
+              ? "bg-zinc-200"
+              : "bg-zinc-900"
             }`}
             onContextMenu={handleTableContextMenu}
           >
