@@ -6,6 +6,12 @@ const spanish = {
 
 const es = {
   translation: {
+    table_renamed_success: "¡Tabla renombrada exitosamente!",
+    field_added_success: "¡Atributo agregado exitosamente!",
+    area_renamed_success: "¡Área renombrada exitosamente!",
+    note_renamed_success: "¡Nota renombrada exitosamente!",
+    field_renamed_success: "¡Atributo renombrado exitosamente!",
+    both_fields_renamed_success: "¡Ambos atributos renombrados exitosamente!",
     report_bug: "Reportar Error",
     import_from: "Importar",
     import: "Importar",

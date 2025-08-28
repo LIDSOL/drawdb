@@ -44,17 +44,13 @@ export default function FieldContextMenu({
     };
 
     const timer = setTimeout(() => {
-      document.addEventListener("click", handleClickOutside);
       document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("contextmenu", handleClickOutside);
       document.addEventListener("keydown", handleEscape);
     }, 100);
 
     return () => {
       clearTimeout(timer);
-      document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("contextmenu", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [visible, onClose]);

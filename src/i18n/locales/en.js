@@ -6,6 +6,12 @@ const english = {
 
 const en = {
   translation: {
+    table_renamed_success: "Table renamed successfully!",
+    field_added_success: "Field added successfully!",
+    area_renamed_success: "Area renamed successfully!",
+    note_renamed_success: "Note renamed successfully!",
+    field_renamed_success: "Field renamed successfully!",
+    both_fields_renamed_success: "Both fields renamed successfully!",
     report_bug: "Report a bug",
     import: "Import",
     import_from: "Import from",
