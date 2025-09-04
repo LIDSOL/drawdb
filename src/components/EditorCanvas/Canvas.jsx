@@ -39,30 +39,6 @@ import { useEventListener } from "usehooks-ts";
 import { areFieldsCompatible } from "../../utils/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const foreignKeyRenameFooter = [
-  <button
-    key="cancel"
-    className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-    onClick={handleForeignKeyRenameCancel}
-  >
-    Cancel
-  </button>,
-  <button
-    key="no"
-    className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-    onClick={handleForeignKeyRenameNo}
-  >
-    No, rename only this field
-  </button>,
-  <button
-    key="yes"
-    className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-    onClick={handleForeignKeyRenameYes}
-  >
-    Yes, rename both fields
-  </button>,
-];
-
 export default function Canvas() {
   const { t } = useTranslation();
   const { transform, setTransform } = useTransform();
@@ -120,7 +96,8 @@ export default function Canvas() {
   const { notes, updateNote, addNote, deleteNote } = useNotes();
   const { layout } = useLayout();
   const { settings } = useSettings();
-  const { undoStack, redoStack, setRedoStack, setUndoStack, pushUndo } = useUndoRedo();
+  const { undoStack, redoStack, setRedoStack, setUndoStack, pushUndo } =
+    useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
   const [dragging, setDragging] = useState({
@@ -560,7 +537,13 @@ export default function Canvas() {
       fieldContextMenu.tableId !== null &&
       fieldContextMenu.fieldId !== null
     ) {
-      deleteField(fieldContextMenu.tableId, fieldContextMenu.fieldId);
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        deleteField(field, fieldContextMenu.tableId);
+      }
     }
   };
 
@@ -1479,6 +1462,30 @@ export default function Canvas() {
     });
   };
 
+  const foreignKeyRenameFooter = [
+    <button
+      key="cancel"
+      className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+      onClick={handleForeignKeyRenameCancel}
+    >
+      Cancel
+    </button>,
+    <button
+      key="no"
+      className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+      onClick={handleForeignKeyRenameNo}
+    >
+      No, rename only this field
+    </button>,
+    <button
+      key="yes"
+      className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+      onClick={handleForeignKeyRenameYes}
+    >
+      Yes, rename both fields
+    </button>,
+  ];
+
   const handleFieldRenameCancel = () => {
     setFieldRenameModal({
       visible: false,
@@ -1799,10 +1806,6 @@ export default function Canvas() {
    */
   const handlePointerDownOnElement = (e, id, type) => {
     // Unified context menu close handler
-    if (e.button === 0) {
-      closeAllContextMenus();
-    }
-    // Unified context menu close handler
     const closeAllContextMenus = () => {
       handleContextMenuClose && handleContextMenuClose();
       handleRelationshipContextMenuClose &&
@@ -1812,6 +1815,10 @@ export default function Canvas() {
       handleCanvasContextMenuClose && handleCanvasContextMenuClose();
       handleFieldContextMenuClose && handleFieldContextMenuClose();
     };
+
+    if (e.button === 0) {
+      closeAllContextMenus();
+    }
 
     if (selectedElement.open && !layout.sidebar) return;
     if (!e.isPrimary) return;
@@ -1830,9 +1837,9 @@ export default function Canvas() {
         y: table.y - pointer.spaces.diagram.y,
       });
 
-  // expose table as elementData so common logic below (multi-select handling)
-  // can use it the same way as AREA/NOTE branches do
-  elementData = table;
+      // expose table as elementData so common logic below (multi-select handling)
+      // can use it the same way as AREA/NOTE branches do
+      elementData = table;
 
       let width = table.width || settings.tableWidth;
       if (table.x - pointer.spaces.diagram.x < -width + 15) {
@@ -1932,7 +1939,7 @@ export default function Canvas() {
       const table = tables.find((t) => t.id === resizing.id);
       const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180);
       updateTable(resizing.id, {
-        width: newWidth
+        width: newWidth,
       });
     } else if (hierarchyLinking) {
       setHierarchyLinkingLine({
@@ -2294,7 +2301,10 @@ export default function Canvas() {
         const tableX = table.x;
         const tableY = table.y;
         const tableWidth = table.width || settings.tableWidth;
-        const tableHeight = (table.fields?.length || 0) * tableFieldHeight + tableHeaderHeight + 7;
+        const tableHeight =
+          (table.fields?.length || 0) * tableFieldHeight +
+          tableHeaderHeight +
+          7;
 
         const tableRect = {
           x: tableX,
@@ -2351,32 +2361,52 @@ export default function Canvas() {
     if (coordsDidUpdate(dragging.element)) {
       const info = getMovedElementDetails();
       // Use pushUndo to ensure centralized filtering/deduplication
-      pushUndo((() => {
-        if (Array.isArray(dragging.id)) {
-          // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
-          const originalPositionsArray = (dragging.initialPositions && typeof dragging.initialPositions === 'object')
-            // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
-            ? dragging.id.map((id) => {
-                const pos = dragging.initialPositions[id];
-                return pos ? { id, x: pos.x, y: pos.y } : { id, x: 0, y: 0 };
+      pushUndo(
+        (() => {
+          if (Array.isArray(dragging.id)) {
+            // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
+            const originalPositionsArray =
+              dragging.initialPositions &&
+              typeof dragging.initialPositions === "object"
+                ? // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
+                  dragging.id.map((id) => {
+                    const pos = dragging.initialPositions[id];
+                    return pos
+                      ? { id, x: pos.x, y: pos.y }
+                      : { id, x: 0, y: 0 };
+                  })
+                : dragging.id.map((id) => {
+                    const t = tables.find((tt) => tt.id === id);
+                    return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
+                  });
+
+            const finalPositionsArray = dragging.id
+              .map((id) => {
+                const table = tables.find((t) => t.id === id);
+                return table ? { id, x: table.x, y: table.y } : null;
               })
-            : dragging.id.map((id) => {
-                const t = tables.find(tt => tt.id === id);
-                return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
-              });
+              .filter(Boolean);
 
-          const finalPositionsArray = dragging.id.map((id) => {
-            const table = tables.find((t) => t.id === id);
-            return table ? { id, x: table.x, y: table.y } : null;
-          }).filter(Boolean);
-
+            const newAction = {
+              action: Action.MOVE,
+              element: dragging.element,
+              // originalPositions = positions before the move
+              originalPositions: originalPositionsArray,
+              // newPositions = positions after the move
+              newPositions: finalPositionsArray,
+              id: dragging.id,
+              message: t("move_element", {
+                coords: `(${info.x}, ${info.y})`,
+                name: info.name,
+              }),
+            };
+            return newAction;
+          }
           const newAction = {
             action: Action.MOVE,
             element: dragging.element,
-            // originalPositions = positions before the move
-            originalPositions: originalPositionsArray,
-            // newPositions = positions after the move
-            newPositions: finalPositionsArray,
+            from: { x: dragging.prevX, y: dragging.prevY },
+            to: { x: info.x, y: info.y },
             id: dragging.id,
             message: t("move_element", {
               coords: `(${info.x}, ${info.y})`,
@@ -2384,20 +2414,8 @@ export default function Canvas() {
             }),
           };
           return newAction;
-        }
-        const newAction = {
-          action: Action.MOVE,
-          element: dragging.element,
-          from: { x: dragging.prevX, y: dragging.prevY },
-          to: { x: info.x, y: info.y },
-          id: dragging.id,
-          message: t("move_element", {
-            coords: `(${info.x}, ${info.y})`,
-            name: info.name,
-          }),
-        };
-        return newAction;
-      })());
+        })(),
+      );
       setRedoStack([]);
     }
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
@@ -2625,10 +2643,16 @@ export default function Canvas() {
       const mouseX = hierarchyLinkingLine.endX;
       const mouseY = hierarchyLinkingLine.endY;
       for (let table of tables) {
-        if (mouseX >= table.x &&
-            mouseX <= table.x + settings.tableWidth &&
-            mouseY >= table.y &&
-            mouseY <= table.y + (tableHeaderHeight + table.fields.length * tableFieldHeight + tableColorStripHeight)) {
+        if (
+          mouseX >= table.x &&
+          mouseX <= table.x + settings.tableWidth &&
+          mouseY >= table.y &&
+          mouseY <=
+            table.y +
+              (tableHeaderHeight +
+                table.fields.length * tableFieldHeight +
+                tableColorStripHeight)
+        ) {
           targetTableId = table.id;
           break;
         }
@@ -2638,7 +2662,9 @@ export default function Canvas() {
       return;
     }
     // Find the original relationship
-    const originalRelationship = relationships.find(r => r.id === hierarchyLinkingLine.relationshipId);
+    const originalRelationship = relationships.find(
+      (r) => r.id === hierarchyLinkingLine.relationshipId,
+    );
     if (!originalRelationship) {
       setHierarchyLinking(false);
       return;
@@ -2651,11 +2677,16 @@ export default function Canvas() {
     }
 
     // Verify that the table is not already included (as parent or child)
-    const existingChildren = originalRelationship.endTableIds ||
-      (originalRelationship.endTableId !== undefined && originalRelationship.endTableId !== null
+    const existingChildren =
+      originalRelationship.endTableIds ||
+      (originalRelationship.endTableId !== undefined &&
+      originalRelationship.endTableId !== null
         ? [originalRelationship.endTableId]
         : []);
-    const allRelatedTables = [originalRelationship.startTableId, ...existingChildren].filter(id => id !== undefined && id !== null);
+    const allRelatedTables = [
+      originalRelationship.startTableId,
+      ...existingChildren,
+    ].filter((id) => id !== undefined && id !== null);
     if (allRelatedTables.includes(targetTableId)) {
       setHierarchyLinking(false);
       return;
@@ -2664,8 +2695,7 @@ export default function Canvas() {
     addChildToSubtype(hierarchyLinkingLine.relationshipId, targetTableId);
     setHierarchyLinking(false);
     // Force a re-render to ensure UI updates properly
-    setTimeout(() => {
-    }, 100);
+    setTimeout(() => {}, 100);
   };
 
   // Handle mouse wheel scrolling
@@ -2787,12 +2817,20 @@ export default function Canvas() {
           {relationships
             .filter((rel) => {
               // For subtype relationships with single child, render normally
-              if (rel.subtype && rel.endTableId !== undefined && !rel.endTableIds) {
+              if (
+                rel.subtype &&
+                rel.endTableId !== undefined &&
+                !rel.endTableIds
+              ) {
                 return true;
               }
               // For subtype relationships with multiple children, only render the parent relationship
               // (it will handle rendering individual lines internally)
-              if (rel.subtype && rel.endTableIds && rel.endTableIds.length > 1) {
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length > 1
+              ) {
                 return true;
               }
               // For non-subtype relationships, render normally
@@ -2800,22 +2838,23 @@ export default function Canvas() {
                 return true;
               }
               // For subtype relationships with single child in array format, render normally
-              if (rel.subtype && rel.endTableIds && rel.endTableIds.length === 1) {
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length === 1
+              ) {
                 return true;
               }
               return true;
             })
             .map((e, i) => (
-            <Relationship
-             
-              key={e.id || i}
-             
-              data={e}
-              onContextMenu={handleRelationshipContextMenu}
-           
-              onConnectSubtypePoint={handleSubtypePointClick}
-            />
-          ))}
+              <Relationship
+                key={e.id || i}
+                data={e}
+                onContextMenu={handleRelationshipContextMenu}
+                onConnectSubtypePoint={handleSubtypePointClick}
+              />
+            ))}
           {tables.map((table) => {
             const isMoving =
               dragging.element === ObjectType.TABLE &&
