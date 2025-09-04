@@ -6,6 +6,12 @@ const english = {
 
 const en = {
   translation: {
+    table_renamed_success: "Table renamed successfully!",
+    field_added_success: "Field added successfully!",
+    area_renamed_success: "Area renamed successfully!",
+    note_renamed_success: "Note renamed successfully!",
+    field_renamed_success: "Field renamed successfully!",
+    both_fields_renamed_success: "Both fields renamed successfully!",
     report_bug: "Report a bug",
     import: "Import",
     import_from: "Import from",
@@ -176,9 +182,12 @@ const en = {
     cannot_connect: "Cannot connect, the columns have different types",
     inconsistency_of_data: "Once the relationship is made, the primary key cannot be changed",
     pk_has_not_be_null: "Cannot set primary key as null",
+    pk_has_to_be_unique: "Cannot remove unique from primary key",
     subtype_fk_must_be_pk: "Foreign keys in subtype relationships must be primary keys",
-    cannot_fk: "Only fields that are a primary key or both not null and unique can be selected as a foreign key",
-    duplicate_relationship: "The parent field already has a relationship with this table child",
+    cannot_fk:
+      "Only fields that are a primary key or both not null and unique can be selected as a foreign key",
+    duplicate_relationship:
+      "The parent field already has a relationship with this table child",
     copied_to_clipboard: "Copied to clipboard",
     create_new_diagram: "Create new diagram",
     cancel: "Cancel",
