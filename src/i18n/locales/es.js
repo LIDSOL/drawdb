@@ -16,7 +16,7 @@ const es = {
     import_from: "Importar",
     import: "Importar",
     file: "Archivo",
-    board:"Centrar tabla",
+    board: "Centrar tabla",
     delete_table_: " Eliminar tabla",
     color_not_available: "Color no disponible para esta notación",
     new: "Nuevo",
@@ -170,14 +170,18 @@ const es = {
     note_deleted: "Nota eliminada",
     relationship_deleted: "Relación eliminada",
     type_deleted: "Tipo eliminado",
-    cannot_connect: "No se puede conectar, las columnas tienen diferentes tipos",
+    cannot_connect:
+      "No se puede conectar, las columnas tienen diferentes tipos",
     pk_has_not_be_null: "No se puede establecer la clave primaria como nula",
     pk_has_to_be_unique: "No se puede quitar único de la clave primaria",
-    cannot_fk: "Solo los campos que son clave primaria o ambos no nulos y únicos pueden seleccionarse como clave foránea",
-    duplicate_relationship: "El campo principal ya tiene una relación con esta tabla hija",
-    inconsistency_of_data: "Una vez hecha la relación, no se puede cambiar la clave primaria",
-    pk_has_not_be_null: "No se puede establecer la clave primaria como nula",
-    subtype_fk_must_be_pk: "Las claves foráneas en relaciones de subtipo deben ser claves primarias",
+    cannot_fk:
+      "Solo los campos que son clave primaria o ambos no nulos y únicos pueden seleccionarse como clave foránea",
+    duplicate_relationship:
+      "El campo principal ya tiene una relación con esta tabla hija",
+    inconsistency_of_data:
+      "Una vez hecha la relación, no se puede cambiar la clave primaria",
+    subtype_fk_must_be_pk:
+      "Las claves foráneas en relaciones de subtipo deben ser claves primarias",
     copied_to_clipboard: "Copiado al portapapeles",
     create_new_diagram: "Crear nuevo diagrama",
     cancel: "Cancelar",
@@ -253,7 +257,8 @@ const es = {
     delete_relationship: "Eliminar relación {{refName}}",
     not_found: "No encontrado",
     readme: "README",
-    Null_not_allowed:"No se permite una fk nula para relaciones identificativas"
+    Null_not_allowed:
+      "No se permite una fk nula para relaciones identificativas",
   },
 };
 
