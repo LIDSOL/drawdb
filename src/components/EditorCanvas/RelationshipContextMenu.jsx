@@ -6,6 +6,8 @@ import {
   IconChevronRight,
   IconEdit2Stroked,
   IconRefresh,
+  IconEyeOpened,
+  IconEyeClosed,
 } from "@douyinfe/semi-icons";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks";
@@ -28,12 +30,17 @@ export default function RelationshipContextMenu({
   onSetDefaultName,
   currentType,
   currentCardinality,
+  relationshipData,
+  onDeleteChild,
+  tables,
+  onToggleLabel,
 }) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const menuRef = useRef();
   const [showTypeSubmenu, setShowTypeSubmenu] = useState(false);
   const [showCardinalitySubmenu, setShowCardinalitySubmenu] = useState(false);
+  const [showDeleteSubmenu, setShowDeleteSubmenu] = useState(false);
   const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -102,6 +109,18 @@ export default function RelationshipContextMenu({
   const handleSubmenuLeave = () => {
     setShowTypeSubmenu(false);
     setShowCardinalitySubmenu(false);
+    setShowDeleteSubmenu(false);
+  };
+
+  const handleDeleteMenuEnter = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSubmenuPosition({
+      x: rect.right,
+      y: rect.top,
+    });
+    setShowDeleteSubmenu(true);
+    setShowTypeSubmenu(false);
+    setShowCardinalitySubmenu(false);
   };
 
   const handleTypeSelect = (type) => {
@@ -116,11 +135,28 @@ export default function RelationshipContextMenu({
     onClose();
   };
 
+  const handleDeleteChild = (childTableId) => {
+    if (onDeleteChild) {
+      onDeleteChild(childTableId);
+    }
+    setShowDeleteSubmenu(false);
+    onClose();
+  };
+
   if (!visible) return null;
+
+  // Determine if label should be shown based on relationship data
+  // For normal relationships: default is shown (true) unless explicitly set to false
+  // For subtype relationships: default is hidden (false) unless explicitly set to true
+  const isLabelVisible =
+    relationshipData?.showLabel !== undefined
+      ? relationshipData.showLabel
+      : currentType !== RelationshipType.SUBTYPE;
 
   const typeLabels = {
     [RelationshipType.ONE_TO_ONE]: "One to One",
     [RelationshipType.ONE_TO_MANY]: "One to Many",
+    [RelationshipType.SUBTYPE]: "Subtype",
   };
 
   const menuItems = [
@@ -133,6 +169,14 @@ export default function RelationshipContextMenu({
       },
     },
     {
+      label: "Set Default Name",
+      icon: <IconRefresh />,
+      onClick: () => {
+        onSetDefaultName();
+        onClose();
+      },
+    },
+    {
       label: t("rename"),
       icon: <IconEdit2Stroked />,
       onClick: () => {
@@ -140,19 +184,25 @@ export default function RelationshipContextMenu({
         onClose();
       },
     },
+    ...(currentType !== RelationshipType.SUBTYPE
+      ? [
+          {
+            label: "Swap Direction",
+            icon: <IconLoopTextStroked />,
+            onClick: () => {
+              onSwapDirection();
+              onClose();
+            },
+          },
+        ]
+      : []),
     {
-      label: "Swap Direction",
-      icon: <IconLoopTextStroked />,
+      label: isLabelVisible ? "Hide Label" : "Show Label",
+      icon: isLabelVisible ? <IconEyeClosed /> : <IconEyeOpened />,
       onClick: () => {
-        onSwapDirection();
-        onClose();
-      },
-    },
-    {
-      label: "Set Default Name",
-      icon: <IconRefresh />,
-      onClick: () => {
-        onSetDefaultName();
+        if (onToggleLabel) {
+          onToggleLabel(!isLabelVisible);
+        }
         onClose();
       },
     },
@@ -163,20 +213,33 @@ export default function RelationshipContextMenu({
       onMouseEnter: handleTypeMenuEnter,
       onMouseLeave: handleSubmenuLeave,
     },
-    {
-      label: "Cardinality",
-      icon: <IconEdit />,
-      hasSubmenu: true,
-      onMouseEnter: handleCardinalityMenuEnter,
-      onMouseLeave: handleSubmenuLeave,
-    },
+    ...(currentType !== RelationshipType.SUBTYPE
+      ? [
+          {
+            label: "Cardinality",
+            icon: <IconEdit />,
+            hasSubmenu: true,
+            onMouseEnter: handleCardinalityMenuEnter,
+            onMouseLeave: handleSubmenuLeave,
+          },
+        ]
+      : []),
     {
       label: t("delete"),
       icon: <IconDeleteStroked />,
-      onClick: () => {
-        onDelete();
-        onClose();
-      },
+      ...(currentType === RelationshipType.SUBTYPE &&
+      relationshipData?.endTableIds?.length > 1
+        ? {
+            hasSubmenu: true,
+            onMouseEnter: handleDeleteMenuEnter,
+            onMouseLeave: handleSubmenuLeave,
+          }
+        : {
+            onClick: () => {
+              onDelete();
+              onClose();
+            },
+          }),
       danger: true,
     },
   ];
@@ -287,6 +350,65 @@ export default function RelationshipContextMenu({
                 {cardinality.label}
               </button>
             ))}
+          </div>
+        )}
+
+      {showDeleteSubmenu &&
+        currentType === RelationshipType.SUBTYPE &&
+        relationshipData?.endTableIds?.length > 1 && (
+          <div
+            className={`fixed z-50 rounded-lg shadow-lg py-1 min-w-[180px] ${
+              settings.mode === "light"
+                ? "bg-white border border-gray-200"
+                : "bg-zinc-800 border border-zinc-600"
+            }`}
+            style={{
+              left: submenuPosition.x,
+              top: submenuPosition.y,
+            }}
+            onMouseEnter={() => setShowDeleteSubmenu(true)}
+            onMouseLeave={handleSubmenuLeave}
+          >
+            <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Subtype Tables
+            </div>
+            {relationshipData.endTableIds.map((childTableId) => {
+              const childTable = tables?.[childTableId];
+              const parentTable = tables?.[relationshipData.startTableId];
+              if (!childTable || !parentTable) return null;
+
+              return (
+                <button
+                  key={childTableId}
+                  className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between transition-colors ${
+                    settings.mode === "light"
+                      ? "text-gray-700 hover:bg-gray-100"
+                      : "text-gray-200 hover:bg-zinc-700"
+                  }`}
+                  onClick={() => handleDeleteChild(childTableId)}
+                >
+                  <span className="text-xs">
+                    {parentTable.name} → {childTable.name}
+                  </span>
+                  <IconDeleteStroked className="w-4 h-4 text-red-600" />
+                </button>
+              );
+            })}
+            <div className="border-t border-gray-200 dark:border-zinc-600 my-1"></div>
+            <button
+              className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors text-red-600 hover:text-red-700 ${
+                settings.mode === "light"
+                  ? "hover:bg-red-50"
+                  : "hover:bg-red-900/20"
+              }`}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <IconDeleteStroked className="w-4 h-4" />
+              Delete Entire Relationship
+            </button>
           </div>
         )}
     </>

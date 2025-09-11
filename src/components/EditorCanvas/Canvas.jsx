@@ -3,6 +3,7 @@ import {
   Action,
   RelationshipType,
   RelationshipCardinalities,
+  SubtypeRestriction,
   Constraint,
   darkBgTheme,
   ObjectType,
@@ -91,6 +92,7 @@ export default function Canvas() {
     updateRelationship,
     setRelationships,
     deleteField,
+    removeChildFromSubtype,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -287,9 +289,54 @@ export default function Canvas() {
     }
   }, [relationshipRenameModal.visible]);
 
+  // Centralized function to close all context menus
+  const closeAllContextMenus = () => {
+    setContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+    });
+    setRelationshipContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      relationshipId: null,
+    });
+    setAreaContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      areaId: null,
+    });
+    setNoteContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      noteId: null,
+    });
+    setCanvasContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      diagramX: 0,
+      diagramY: 0,
+    });
+    setFieldContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+      fieldId: null,
+    });
+  };
+
   const handleTableContextMenu = (e, tableId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Close all other context menus
+    closeAllContextMenus();
 
     // Close field context menu
     handleFieldContextMenuClose();
@@ -315,8 +362,7 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Close field context menu
-    handleFieldContextMenuClose();
+    closeAllContextMenus();
 
     setRelationshipContextMenu({
       visible: true,
@@ -477,12 +523,7 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Close all other context menus
-    handleContextMenuClose();
-    handleRelationshipContextMenuClose();
-    handleAreaContextMenuClose();
-    handleNoteContextMenuClose();
-    handleCanvasContextMenuClose();
+    closeAllContextMenus();
 
     setFieldContextMenu({
       visible: true,
@@ -809,6 +850,15 @@ export default function Canvas() {
             ? RelationshipCardinalities[newType][0].label
             : "";
 
+        // Determine if this is switching to/from subtype
+        const isBecomingSubtype = newType === RelationshipType.SUBTYPE;
+        const wasSubtype =
+          relationship.relationshipType === RelationshipType.SUBTYPE;
+        // Set default subtype_restriction when becoming subtype
+        const defaultSubtypeRestriction = isBecomingSubtype
+          ? SubtypeRestriction.DISJOINT_TOTAL
+          : undefined;
+
         setUndoStack((prev) => [
           ...prev,
           {
@@ -818,15 +868,52 @@ export default function Canvas() {
             undo: {
               relationshipType: relationship.relationshipType,
               cardinality: relationship.cardinality,
+              subtype: relationship.subtype,
+              subtype_restriction: relationship.subtype_restriction,
             },
             redo: {
               relationshipType: newType,
               cardinality: defaultCardinality,
+              subtype: isBecomingSubtype,
+              subtype_restriction: defaultSubtypeRestriction,
             },
             message: `Change type for ${relationship.name}`,
           },
         ]);
         setRedoStack([]);
+
+        // When becoming subtype, convert existing FK fields to primary keys
+        if (isBecomingSubtype && !wasSubtype) {
+          const childTableId = relationship.endTableId;
+          const parentTableId = relationship.startTableId;
+
+          if (childTableId !== undefined && parentTableId !== undefined) {
+            const childTable = tables.find((t) => t.id === childTableId);
+
+            if (childTable) {
+              // Find FK fields that reference the parent table
+              const fkFieldsToPromote = childTable.fields.filter(
+                (field) =>
+                  field.foreignK &&
+                  field.foreignKey &&
+                  field.foreignKey.tableId === parentTableId,
+              );
+
+              if (fkFieldsToPromote.length > 0) {
+                // Update each FK field to be a primary key
+                const updatedFields = childTable.fields.map((field) => {
+                  if (fkFieldsToPromote.some((fk) => fk.id === field.id)) {
+                    return { ...field, primary: true };
+                  }
+                  return field;
+                });
+                // Update the table with the new fields
+                updateTable(childTableId, { fields: updatedFields });
+              }
+            }
+          }
+        }
+
         setRelationships((prev) =>
           prev.map((e, idx) =>
             idx === relationshipContextMenu.relationshipId
@@ -834,6 +921,8 @@ export default function Canvas() {
                   ...e,
                   relationshipType: newType,
                   cardinality: defaultCardinality,
+                  subtype: isBecomingSubtype,
+                  subtype_restriction: defaultSubtypeRestriction,
                 }
               : e,
           ),
@@ -875,6 +964,25 @@ export default function Canvas() {
   const handleDeleteRelationship = () => {
     if (relationshipContextMenu.relationshipId !== null) {
       deleteRelationship(relationshipContextMenu.relationshipId);
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleDeleteChildFromSubtype = (childTableId) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      removeChildFromSubtype(
+        relationshipContextMenu.relationshipId,
+        childTableId,
+      );
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleToggleRelationshipLabel = (showLabel) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      updateRelationship(relationshipContextMenu.relationshipId, {
+        showLabel: showLabel,
+      });
       handleRelationshipContextMenuClose();
     }
   };
@@ -932,8 +1040,7 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Close field context menu
-    handleFieldContextMenuClose();
+    closeAllContextMenus();
 
     setAreaContextMenu({
       visible: true,
@@ -1055,8 +1162,7 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Close field context menu
-    handleFieldContextMenuClose();
+    closeAllContextMenus();
 
     setNoteContextMenu({
       visible: true,
@@ -1546,8 +1652,7 @@ export default function Canvas() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Close field context menu
-    handleFieldContextMenuClose();
+    closeAllContextMenus();
 
     // Convert screen coordinates to canvas coordinates
     const screenX = e.clientX;
@@ -3014,6 +3119,14 @@ export default function Canvas() {
         onChangeType={handleChangeRelationshipType}
         onChangeCardinality={handleChangeRelationshipCardinality}
         onSetDefaultName={handleSetDefaultRelationshipName}
+        onDeleteChild={handleDeleteChildFromSubtype}
+        onToggleLabel={handleToggleRelationshipLabel}
+        relationshipData={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]
+            : null
+        }
+        tables={tables}
         currentType={
           relationshipContextMenu.relationshipId !== null
             ? relationships[relationshipContextMenu.relationshipId]
