@@ -15,6 +15,7 @@ import {
   RelationshipType,
   RelationshipCardinalities,
 } from "../../data/constants";
+import { calculateSafePosition } from "../../utils/contextMenuUtils";
 
 export default function RelationshipContextMenu({
   visible,
@@ -88,20 +89,26 @@ export default function RelationshipContextMenu({
 
   const handleTypeMenuEnter = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setSubmenuPosition({
-      x: rect.right,
-      y: rect.top,
-    });
+    const safeSubmenuPosition = calculateSafePosition(
+      rect.right,
+      rect.top,
+      140,
+      150,
+    );
+    setSubmenuPosition(safeSubmenuPosition);
     setShowTypeSubmenu(true);
     setShowCardinalitySubmenu(false);
   };
 
   const handleCardinalityMenuEnter = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setSubmenuPosition({
-      x: rect.right,
-      y: rect.top,
-    });
+    const safeSubmenuPosition = calculateSafePosition(
+      rect.right,
+      rect.top,
+      140,
+      150,
+    );
+    setSubmenuPosition(safeSubmenuPosition);
     setShowCardinalitySubmenu(true);
     setShowTypeSubmenu(false);
   };
@@ -114,10 +121,13 @@ export default function RelationshipContextMenu({
 
   const handleDeleteMenuEnter = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setSubmenuPosition({
-      x: rect.right,
-      y: rect.top,
-    });
+    const safeSubmenuPosition = calculateSafePosition(
+      rect.right,
+      rect.top,
+      180,
+      200,
+    );
+    setSubmenuPosition(safeSubmenuPosition);
     setShowDeleteSubmenu(true);
     setShowTypeSubmenu(false);
     setShowCardinalitySubmenu(false);
@@ -144,6 +154,9 @@ export default function RelationshipContextMenu({
   };
 
   if (!visible) return null;
+
+  // Calculate safe position for the main menu
+  const safePosition = calculateSafePosition(x, y);
 
   // Determine if label should be shown based on relationship data
   // For normal relationships: default is shown (true) unless explicitly set to false
@@ -254,8 +267,8 @@ export default function RelationshipContextMenu({
             : "bg-zinc-800 border border-zinc-600"
         }`}
         style={{
-          left: x,
-          top: y,
+          left: safePosition.x,
+          top: safePosition.y,
         }}
       >
         {menuItems.map((item, index) => (

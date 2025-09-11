@@ -6,6 +6,7 @@ import {
 } from "@douyinfe/semi-icons";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks";
+import { calculateSafePosition } from "../../utils/contextMenuUtils";
 
 export default function AreaContextMenu({
   visible,
@@ -66,6 +67,9 @@ export default function AreaContextMenu({
 
   if (!visible) return null;
 
+  // Calculate safe position for the menu
+  const safePosition = calculateSafePosition(x, y);
+
   const menuItems = [
     {
       label: t("edit"),
@@ -111,8 +115,8 @@ export default function AreaContextMenu({
           : "bg-zinc-800 border border-zinc-600"
       }`}
       style={{
-        left: x,
-        top: y,
+        left: safePosition.x,
+        top: safePosition.y,
       }}
     >
       {menuItems.map((item, index) => (
