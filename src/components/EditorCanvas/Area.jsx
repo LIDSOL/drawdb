@@ -24,6 +24,7 @@ import { useHover } from "usehooks-ts";
 export default function Area({
   data,
   onPointerDown,
+  onContextMenu,
   setResize,
   setInitCoords,
 }) {
@@ -103,6 +104,9 @@ export default function Area({
         width={data.width > 0 ? data.width : 0}
         height={data.height > 0 ? data.height : 0}
         onPointerDown={onPointerDown}
+        onContextMenu={(e) =>
+          onContextMenu && onContextMenu(e, data.id, e.clientX, e.clientY)
+        }
       >
         <div
           className={`border-2 ${
