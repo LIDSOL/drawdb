@@ -555,7 +555,7 @@ export default function RelationshipInfo({ data }) {
         type="danger"
         onClick={handleDeleteRelationship}
       >
-        {t("delete")}
+        {t("delete_relationship_")}
       </Button>
     </>
   );

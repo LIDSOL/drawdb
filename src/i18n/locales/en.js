@@ -13,6 +13,7 @@ const en = {
     board: "Center Table",
     go_to_board: "Go to board",
     delete_table_: " Delete table",
+    delete_relationship_: " Delete relationship",
     color_not_available: "Color not available for this notation",
     new: "New",
     new_window: "New window",
