@@ -598,6 +598,14 @@ export default function Canvas() {
         (f) => f.id === fieldContextMenu.fieldId,
       );
       if (table && field) {
+        if (
+          field.primary &&
+          relationships.some((rel) => rel.startTableId === table.id)
+        ) {
+          Toast.info(t("inconsistency_of_data"));
+          return;
+        }
+
         const updatedFields = table.fields.map((f) =>
           f.id === fieldContextMenu.fieldId
             ? {
