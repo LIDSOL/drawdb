@@ -6,11 +6,17 @@ const spanish = {
 
 const es = {
   translation: {
+    table_renamed_success: "¡Tabla renombrada exitosamente!",
+    field_added_success: "¡Atributo agregado exitosamente!",
+    area_renamed_success: "¡Área renombrada exitosamente!",
+    note_renamed_success: "¡Nota renombrada exitosamente!",
+    field_renamed_success: "¡Atributo renombrado exitosamente!",
+    both_fields_renamed_success: "¡Ambos atributos renombrados exitosamente!",
     report_bug: "Reportar Error",
     import_from: "Importar",
     import: "Importar",
     file: "Archivo",
-    board:"Centrar tabla",
+    board: "Centrar tabla",
     delete_table_: " Eliminar tabla",
     color_not_available: "Color no disponible para esta notación",
     new: "Nuevo",
@@ -152,7 +158,7 @@ const es = {
     on_update: "Al actualizar",
     on_delete: "Al eliminar",
     swap: "Intercambiar",
-    parent_line: "Línea principal",
+    parent_lines: "Líneas principales",
     parent_diamond: "Diamante principal",
     one_to_one: "Uno a uno",
     one_to_many: "Uno a muchos",
@@ -166,9 +172,16 @@ const es = {
     type_deleted: "Tipo eliminado",
     cannot_connect:
       "No se puede conectar, las columnas tienen diferentes tipos",
-    inconsistency_of_data: "Una vez hecha la relación, no se puede cambiar la clave primaria",
     pk_has_not_be_null: "No se puede establecer la clave primaria como nula",
-    subtype_fk_must_be_pk: "Las claves foráneas en relaciones de subtipo deben ser claves primarias",
+    pk_has_to_be_unique: "No se puede quitar único de la clave primaria",
+    cannot_fk:
+      "Solo los campos que son clave primaria o ambos no nulos y únicos pueden seleccionarse como clave foránea",
+    duplicate_relationship:
+      "El campo principal ya tiene una relación con esta tabla hija",
+    inconsistency_of_data:
+      "Una vez hecha la relación, no se puede cambiar la clave primaria",
+    subtype_fk_must_be_pk:
+      "Las claves foráneas en relaciones de subtipo deben ser claves primarias",
     copied_to_clipboard: "Copiado al portapapeles",
     create_new_diagram: "Crear nuevo diagrama",
     cancel: "Cancelar",
@@ -244,7 +257,8 @@ const es = {
     delete_relationship: "Eliminar relación {{refName}}",
     not_found: "No encontrado",
     readme: "README",
-    Null_not_allowed:"No se permite una fk nula para relaciones identificativas"
+    Null_not_allowed:
+      "No se permite una fk nula para relaciones identificativas",
   },
 };
 

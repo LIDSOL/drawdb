@@ -21,7 +21,7 @@ import {
 } from "../../hooks";
 import { useTranslation } from "react-i18next";
 
-export default function Note({ data, onPointerDown }) {
+export default function Note({ data, onPointerDown, onContextMenu }) {
   const w = 180;
   const r = 3;
   const fold = 24;
@@ -139,6 +139,9 @@ export default function Note({ data, onPointerDown }) {
         width={w}
         height={data.height}
         onPointerDown={onPointerDown}
+        onContextMenu={(e) =>
+          onContextMenu && onContextMenu(e, data.id, e.clientX, e.clientY)
+        }
       >
         <div className="text-gray-900 select-none w-full h-full cursor-move px-3 py-2">
           <div className="flex justify-between gap-1 w-full">

@@ -7,11 +7,12 @@ import {
   Table,
   Input,
 } from "@douyinfe/semi-ui";
-import { Toast } from '@douyinfe/semi-ui';
+import { Toast } from "@douyinfe/semi-ui";
 import {
   IconDeleteStroked,
   IconLoopTextStroked,
   IconMore,
+  IconRefresh,
 } from "@douyinfe/semi-icons";
 import {
   RelationshipType,
@@ -22,7 +23,7 @@ import {
   ObjectType,
   Notation,
 } from "../../../data/constants";
-import { useDiagram, useSettings, useUndoRedo} from "../../../hooks";
+import { useDiagram, useSettings, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -40,8 +41,14 @@ const columns = [
 export default function RelationshipInfo({ data }) {
   const { setUndoStack, setRedoStack } = useUndoRedo();
   const { settings } = useSettings();
-  const { tables, setTables, setRelationships, deleteRelationship, updateRelationship, removeChildFromSubtype } =
-    useDiagram();
+  const {
+    tables,
+    setTables,
+    setRelationships,
+    deleteRelationship,
+    updateRelationship,
+    removeChildFromSubtype,
+  } = useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
   // Helper function to get the effective end table ID and field ID
@@ -72,7 +79,9 @@ export default function RelationshipInfo({ data }) {
   const swapKeys = () => {
     // Disable swap for subtype relationships with multiple children
     if (data.subtype && data.endTableIds && data.endTableIds.length > 1) {
-      console.warn("Cannot swap keys for subtype relationships with multiple children");
+      console.warn(
+        "Cannot swap keys for subtype relationships with multiple children",
+      );
       return;
     }
     const effectiveEndTable = getEffectiveEndTable();
@@ -107,7 +116,9 @@ export default function RelationshipInfo({ data }) {
           ? {
               ...e,
               name: `fk_${tables[effectiveEndTable.tableId].name}_${
-                tables[effectiveEndTable.tableId].fields[effectiveEndTable.fieldId].name
+                tables[effectiveEndTable.tableId].fields[
+                  effectiveEndTable.fieldId
+                ].name
               }_${tables[e.startTableId].name}`,
               startTableId: effectiveEndTable.tableId,
               startFieldId: effectiveEndTable.fieldId,
@@ -132,7 +143,9 @@ export default function RelationshipInfo({ data }) {
     const isBecomingSubtype = value === RelationshipType.SUBTYPE;
     const wasSubtype = data.relationshipType === RelationshipType.SUBTYPE;
     // Set default subtype_restriction when becoming subtype
-    const defaultSubtypeRestriction = isBecomingSubtype ? SubtypeRestriction.DISJOINT_TOTAL : undefined;
+    const defaultSubtypeRestriction = isBecomingSubtype
+      ? SubtypeRestriction.DISJOINT_TOTAL
+      : undefined;
 
     setUndoStack((prev) => [
       ...prev,
@@ -166,31 +179,32 @@ export default function RelationshipInfo({ data }) {
       const parentTableId = data.startTableId;
 
       if (childTableId !== undefined && parentTableId !== undefined) {
-        const childTable = tables.find(t => t.id === childTableId);
+        const childTable = tables.find((t) => t.id === childTableId);
 
         if (childTable) {
           // Find FK fields that reference the parent table
-          const fkFieldsToPromote = childTable.fields.filter(field =>
-            field.foreignK &&
-            field.foreignKey &&
-            field.foreignKey.tableId === parentTableId
+          const fkFieldsToPromote = childTable.fields.filter(
+            (field) =>
+              field.foreignK &&
+              field.foreignKey &&
+              field.foreignKey.tableId === parentTableId,
           );
 
           if (fkFieldsToPromote.length > 0) {
             // Update each FK field to be a primary key
-            const updatedFields = childTable.fields.map(field => {
-              if (fkFieldsToPromote.some(fk => fk.id === field.id)) {
+            const updatedFields = childTable.fields.map((field) => {
+              if (fkFieldsToPromote.some((fk) => fk.id === field.id)) {
                 return { ...field, primary: true };
               }
               return field;
             });
             // Update the table with the new fields
-            setTables(prevTables =>
-              prevTables.map(table =>
+            setTables((prevTables) =>
+              prevTables.map((table) =>
                 table.id === childTableId
                   ? { ...table, fields: updatedFields }
-                  : table
-              )
+                  : table,
+              ),
             );
           }
         }
@@ -205,7 +219,7 @@ export default function RelationshipInfo({ data }) {
               relationshipType: value,
               cardinality: defaultCardinality,
               subtype: isBecomingSubtype,
-              subtype_restriction: defaultSubtypeRestriction
+              subtype_restriction: defaultSubtypeRestriction,
             }
           : e,
       ),
@@ -280,36 +294,51 @@ export default function RelationshipInfo({ data }) {
     );
   };
 
-    const toggleParentCardinality = () => {
+  const toggleParentCardinality = () => {
     // Get foreign key fields from the child table (end table) that reference the parent table (start table)
     const effectiveEndTable = getEffectiveEndTable();
-    const childTable = effectiveEndTable.tableId !== null ? tables[effectiveEndTable.tableId] : null;
+    const childTable =
+      effectiveEndTable.tableId !== null
+        ? tables[effectiveEndTable.tableId]
+        : null;
     if (!childTable) {
       console.warn("Child table not found for relationship", data.id);
       return;
     }
 
     // Find FK fields in the child table that reference the parent table
-    const fkFields = childTable.fields.filter(field =>
-      field.foreignK &&
-      field.foreignKey &&
-      field.foreignKey.tableId === data.startTableId
+    const fkFields = childTable.fields.filter(
+      (field) =>
+        field.foreignK &&
+        field.foreignKey &&
+        field.foreignKey.tableId === data.startTableId,
     );
     if (fkFields.length === 0) {
-      console.warn("No FK fields found in child table", childTable.id, "referencing parent table", data.startTableId);
+      console.warn(
+        "No FK fields found in child table",
+        childTable.id,
+        "referencing parent table",
+        data.startTableId,
+      );
       return;
     }
 
-    const fkIsToPk=fkFields[0].primary;
-    if(fkIsToPk){
-        Toast.info(t("Null_not_allowed"));
-        return;
+    const fkIsToPk = fkFields[0].primary;
+    if (fkIsToPk) {
+      Toast.info(t("Null_not_allowed"));
+      return;
     }
 
-    const fkFieldIds = fkFields.map(field => field.id);
+    const fkFieldIds = fkFields.map((field) => field.id);
     const newNotNullValue = !fkFields[0].notNull;
-    const undoFields = fkFields.map(field => ({ id: field.id, notNull: field.notNull }));
-    const redoFields = fkFields.map(field => ({ id: field.id, notNull: newNotNullValue }));
+    const undoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: field.notNull,
+    }));
+    const redoFields = fkFields.map((field) => ({
+      id: field.id,
+      notNull: newNotNullValue,
+    }));
 
     setUndoStack((prev) => [
       ...prev,
@@ -345,6 +374,42 @@ export default function RelationshipInfo({ data }) {
         return table;
       }),
     );
+  };
+
+  const setDefaultName = () => {
+    const startTable = tables.find((t) => t.id === data.startTableId);
+    const endTable = tables.find((t) => t.id === data.endTableId);
+
+    if (!startTable || !endTable) return;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === data.startFieldId,
+    );
+    const endField = endTable.fields?.find((f) => f.id === data.endFieldId);
+
+    if (!startField || !endField) return;
+
+    const defaultName = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    if (data.name === defaultName) return; // Already has default name
+
+    setUndoStack((prev) => [
+      ...prev,
+      {
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        component: "self",
+        rid: data.id,
+        undo: { name: data.name },
+        redo: { name: defaultName },
+        message: t("edit_relationship", {
+          refName: defaultName,
+          extra: "[set default name]",
+        }),
+      },
+    ]);
+    setRedoStack([]);
+    updateRelationship(data.id, { name: defaultName });
   };
 
   const removeSubtypeHierarchy = (indexToRemove) => {
@@ -393,7 +458,9 @@ export default function RelationshipInfo({ data }) {
       <div className="flex justify-between items-center mb-3">
         <div className="me-3">
           <span className="font-semibold">{t("primary")}: </span>
-          {effectiveEndTable.tableId !== null ? tables[effectiveEndTable.tableId]?.name : 'N/A'}
+          {effectiveEndTable.tableId !== null
+            ? tables[effectiveEndTable.tableId]?.name
+            : "N/A"}
         </div>
         <div className="mx-1">
           <span className="font-semibold">{t("foreign")}: </span>
@@ -412,9 +479,13 @@ export default function RelationshipInfo({ data }) {
                         tables[data.startTableId]?.fields[data.startFieldId]
                           ?.name
                       })`,
-                      primary: `${effectiveEndTable.tableId !== null ? tables[effectiveEndTable.tableId]?.name : 'N/A'}(${
-                        effectiveEndTable.tableId !== null && effectiveEndTable.fieldId !== null ? 
-                        tables[effectiveEndTable.tableId]?.fields[effectiveEndTable.fieldId]?.name : 'N/A'
+                      primary: `${effectiveEndTable.tableId !== null ? tables[effectiveEndTable.tableId]?.name : "N/A"}(${
+                        effectiveEndTable.tableId !== null &&
+                        effectiveEndTable.fieldId !== null
+                          ? tables[effectiveEndTable.tableId]?.fields[
+                              effectiveEndTable.fieldId
+                            ]?.name
+                          : "N/A"
                       })`,
                     },
                   ]}
@@ -427,9 +498,18 @@ export default function RelationshipInfo({ data }) {
                     icon={<IconLoopTextStroked />}
                     block
                     onClick={swapKeys}
-                    disabled={data.subtype && data.endTableIds && data.endTableIds.length > 1}
+                    disabled={
+                      data.subtype &&
+                      data.endTableIds &&
+                      data.endTableIds.length > 1
+                    }
                   >
                     {t("swap")}
+                  </Button>
+                </div>
+                <div className="mt-2">
+                  <Button icon={<IconRefresh />} block onClick={setDefaultName}>
+                    Set Default Name
                   </Button>
                 </div>
               </div>
@@ -452,76 +532,87 @@ export default function RelationshipInfo({ data }) {
         className="w-full"
         onChange={changeRelationshipType}
       />
-      {settings.notation !== "default" && data.relationshipType !== RelationshipType.SUBTYPE && (
-        <>
-          <div className="font-semibold my-1">{t("cardinality")}:</div>
-          <div className="flex items-center w-full gap-2">
-            <Select
-              optionList={
-                RelationshipCardinalities[data.relationshipType] &&
-                RelationshipCardinalities[data.relationshipType].map((c) => ({
-                  label: c.label,
-                  value: c.label,
-                }))
-              }
-              value={data.cardinality}
-              className="w-full"
-              onChange={changeCardinality}
-              disabled={!data.relationshipType}
-              placeholder={t("select_cardinality")}
-            />
-            {(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X) && (
-              <Button
-                icon={<IconLoopTextStroked />}
-                type="tertiary"
-                onClick={toggleParentCardinality}
-                aria-label="Toggle Parent Cardinality"
+      {settings.notation !== "default" &&
+        data.relationshipType !== RelationshipType.SUBTYPE && (
+          <>
+            <div className="font-semibold my-1">{t("cardinality")}:</div>
+            <div className="flex items-center w-full gap-2">
+              <Select
+                optionList={
+                  RelationshipCardinalities[data.relationshipType] &&
+                  RelationshipCardinalities[data.relationshipType].map((c) => ({
+                    label: c.label,
+                    value: c.label,
+                  }))
+                }
+                value={data.cardinality}
+                className="w-full"
+                onChange={changeCardinality}
+                disabled={!data.relationshipType}
+                placeholder={t("select_cardinality")}
               />
-            )}
-          </div>
-        </>
-      )}
+              {(settings.notation === Notation.CROWS_FOOT ||
+                settings.notation === Notation.IDEF1X) && (
+                <Button
+                  icon={<IconLoopTextStroked />}
+                  type="tertiary"
+                  onClick={toggleParentCardinality}
+                  aria-label="Toggle Parent Cardinality"
+                />
+              )}
+            </div>
+          </>
+        )}
       {/* Subtype restriction - only available when relationship type is SUBTYPE */}
-      {data.relationshipType === RelationshipType.SUBTYPE && settings.notation !== Notation.DEFAULT && (
-        <Row gutter={6} className="my-3">
-          <div className="font-semibold my-1">
-            {t("subtype_restriction")}:
-          </div>
-          <Select
-            optionList={Object.values(SubtypeRestriction).map((v) => ({
-              label: t(v),
-              value: v,
-            }))}
-            value={data.subtype_restriction}
-            className="w-full"
-            onChange={changeSubtypeRestriction}
-          />
-        </Row>
-      )}
+      {data.relationshipType === RelationshipType.SUBTYPE &&
+        settings.notation !== Notation.DEFAULT && (
+          <Row gutter={6} className="my-3">
+            <div className="font-semibold my-1">
+              {t("subtype_restriction")}:
+            </div>
+            <Select
+              optionList={Object.values(SubtypeRestriction).map((v) => ({
+                label: t(v),
+                value: v,
+              }))}
+              value={data.subtype_restriction}
+              className="w-full"
+              onChange={changeSubtypeRestriction}
+            />
+          </Row>
+        )}
 
       {/* Subtype hierarchy management - show multiple connected tables */}
-      {data.relationshipType === RelationshipType.SUBTYPE && data.endTableIds && data.endTableIds.length > 1 && (
-        <div className="my-3">
-          <div className="font-semibold my-1">{t("subtype")} {t("tables")}:</div>
-          <div className="space-y-2">
-            {data.endTableIds.map((endTableId, index) => (
-              <div key={`${endTableId}-${index}`} className="flex items-center justify-between p-2 border rounded ">
-                <span className="text-sm">
-                  {tables[data.startTableId]?.name} → {tables[endTableId]?.name}
-                </span>
-                <Button
-                  icon={<IconDeleteStroked />}
-                  type="danger"
-                  size="small"
-                  onClick={() => removeSubtypeHierarchy(index)}
+      {data.relationshipType === RelationshipType.SUBTYPE &&
+        data.endTableIds &&
+        data.endTableIds.length > 1 && (
+          <div className="my-3">
+            <div className="font-semibold my-1">
+              {t("subtype")} {t("tables")}:
+            </div>
+            <div className="space-y-2">
+              {data.endTableIds.map((endTableId, index) => (
+                <div
+                  key={`${endTableId}-${index}`}
+                  className="flex items-center justify-between p-2 border rounded "
                 >
-                  {t("delete")}
-                </Button>
-              </div>
-            ))}
+                  <span className="text-sm">
+                    {tables[data.startTableId]?.name} →{" "}
+                    {tables[endTableId]?.name}
+                  </span>
+                  <Button
+                    icon={<IconDeleteStroked />}
+                    type="danger"
+                    size="small"
+                    onClick={() => removeSubtypeHierarchy(index)}
+                  >
+                    {t("delete")}
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       <Row gutter={6} className="my-3">
         <Col span={12}>
           <div className="font-semibold">{t("on_update")}: </div>

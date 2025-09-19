@@ -1,8 +1,9 @@
-import { useRef, useState,useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Action,
   RelationshipType,
   RelationshipCardinalities,
+  SubtypeRestriction,
   Constraint,
   darkBgTheme,
   ObjectType,
@@ -10,12 +11,19 @@ import {
   tableFieldHeight,
   tableColorStripHeight,
   Notation,
+  Tab,
 } from "../../data/constants";
-import { Toast } from "@douyinfe/semi-ui";
+import { Toast, Modal, Input } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
 import Note from "./Note";
+import TableContextMenu from "./TableContextMenu";
+import RelationshipContextMenu from "./RelationshipContextMenu";
+import AreaContextMenu from "./AreaContextMenu";
+import NoteContextMenu from "./NoteContextMenu";
+import CanvasContextMenu from "./CanvasContextMenu";
+import FieldContextMenu from "./FieldContextMenu";
 import {
   useCanvas,
   useSettings,
@@ -50,6 +58,7 @@ export default function Canvas() {
   }, [location, navigate, setTransform]);
 
   const [isAreaSelecting, setIsAreaSelecting] = useState(false);
+  const [isDrawingSelectionArea, setIsDrawingSelectionArea] = useState(false);
   const [selectionArea, setSelectionArea] = useState({
     startX: 0,
     startY: 0,
@@ -71,13 +80,26 @@ export default function Canvas() {
     pointer,
   } = canvasContextValue;
 
-  const { tables, updateTable, relationships, addRelationship, addChildToSubtype} =
-    useDiagram();
-  const { areas, updateArea } = useAreas();
-  const { notes, updateNote } = useNotes();
+  const {
+    tables,
+    updateTable,
+    relationships,
+    addRelationship,
+    addTable,
+    deleteTable,
+    addChildToSubtype,
+    deleteRelationship,
+    updateRelationship,
+    setRelationships,
+    deleteField,
+    removeChildFromSubtype,
+  } = useDiagram();
+  const { areas, updateArea, addArea, deleteArea } = useAreas();
+  const { notes, updateNote, addNote, deleteNote } = useNotes();
   const { layout } = useLayout();
   const { settings } = useSettings();
-  const { setRedoStack, pushUndo } = useUndoRedo();
+  const { undoStack, redoStack, setRedoStack, setUndoStack, pushUndo } =
+    useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
   const [dragging, setDragging] = useState({
@@ -136,22 +158,1782 @@ export default function Canvas() {
     pointerY: 0,
   });
 
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    tableId: null,
+  });
+
+  const [relationshipContextMenu, setRelationshipContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    relationshipId: null,
+  });
+
+  const [areaContextMenu, setAreaContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    areaId: null,
+  });
+
+  const [noteContextMenu, setNoteContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    noteId: null,
+  });
+
+  const [canvasContextMenu, setCanvasContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    diagramX: 0,
+    diagramY: 0,
+  });
+
+  const [fieldContextMenu, setFieldContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    tableId: null,
+    fieldId: null,
+  });
+
+  const [renameModal, setRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [relationshipRenameModal, setRelationshipRenameModal] = useState({
+    visible: false,
+    relationshipId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [areaRenameModal, setAreaRenameModal] = useState({
+    visible: false,
+    areaId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [noteRenameModal, setNoteRenameModal] = useState({
+    visible: false,
+    noteId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [fieldRenameModal, setFieldRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    currentName: "",
+    newName: "",
+  });
+
+  const [foreignKeyRenameModal, setForeignKeyRenameModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    newName: "",
+    relatedField: null, // { tableId, fieldId, tableName, fieldName }
+  });
+
+  const fieldRenameInputRef = useRef(null);
+  const tableRenameInputRef = useRef(null);
+  const relationshipRenameInputRef = useRef(null);
+
+  // Auto-select text when field rename modal opens
+  useEffect(() => {
+    if (fieldRenameModal.visible && fieldRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (fieldRenameInputRef.current) {
+          fieldRenameInputRef.current.focus();
+          fieldRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [fieldRenameModal.visible]);
+
+  // Auto-select text when table rename modal opens
+  useEffect(() => {
+    if (renameModal.visible && tableRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (tableRenameInputRef.current) {
+          tableRenameInputRef.current.focus();
+          tableRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [renameModal.visible]);
+
+  // Auto-select text when relationship rename modal opens
+  useEffect(() => {
+    if (relationshipRenameModal.visible && relationshipRenameInputRef.current) {
+      const timer = setTimeout(() => {
+        if (relationshipRenameInputRef.current) {
+          relationshipRenameInputRef.current.focus();
+          relationshipRenameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [relationshipRenameModal.visible]);
+
+  // Centralized function to close all context menus
+  const closeAllContextMenus = () => {
+    setContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+    });
+    setRelationshipContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      relationshipId: null,
+    });
+    setAreaContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      areaId: null,
+    });
+    setNoteContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      noteId: null,
+    });
+    setCanvasContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      diagramX: 0,
+      diagramY: 0,
+    });
+    setFieldContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+      fieldId: null,
+    });
+  };
+
+  const handleTableContextMenu = (e, tableId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Close all other context menus
+    closeAllContextMenus();
+
+    // Close field context menu
+    handleFieldContextMenuClose();
+
+    setContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      tableId: tableId,
+    });
+  };
+
+  const handleContextMenuClose = () => {
+    setContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+    });
+  };
+
+  const handleRelationshipContextMenu = (e, relationshipId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    closeAllContextMenus();
+
+    setRelationshipContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      relationshipId: relationshipId,
+    });
+  };
+
+  const handleRelationshipContextMenuClose = () => {
+    setRelationshipContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      relationshipId: null,
+    });
+  };
+
+  const handleEditTable = () => {
+    if (contextMenu.tableId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          currentTab: Tab.TABLES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_table_${contextMenu.tableId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleRenameTable = () => {
+    if (contextMenu.tableId !== null) {
+      const table = tables.find((t) => t.id === contextMenu.tableId);
+      if (table) {
+        setRenameModal({
+          visible: true,
+          tableId: contextMenu.tableId,
+          currentName: table.name,
+          newName: table.name,
+        });
+      }
+    }
+  };
+
+  const handleRenameConfirm = () => {
+    if (renameModal.tableId !== null && renameModal.newName.trim()) {
+      updateTable(renameModal.tableId, {
+        name: renameModal.newName.trim(),
+      });
+      setRenameModal({
+        visible: false,
+        tableId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success(t("table_renamed_success"));
+    }
+  };
+
+  const handleRenameCancel = () => {
+    setRenameModal({
+      visible: false,
+      tableId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleRelationshipRenameConfirm = () => {
+    if (
+      relationshipRenameModal.relationshipId !== null &&
+      relationshipRenameModal.newName.trim()
+    ) {
+      updateRelationship(relationshipRenameModal.relationshipId, {
+        name: relationshipRenameModal.newName.trim(),
+      });
+      setRelationshipRenameModal({
+        visible: false,
+        relationshipId: null,
+        currentName: "",
+        newName: "",
+      });
+    }
+  };
+
+  const handleRelationshipRenameCancel = () => {
+    setRelationshipRenameModal({
+      visible: false,
+      relationshipId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleAddField = () => {
+    if (contextMenu.tableId !== null) {
+      const table = tables.find((t) => t.id === contextMenu.tableId);
+      if (table) {
+        const maxId = table.fields.reduce(
+          (max, field) =>
+            Math.max(max, typeof field.id === "number" ? field.id : -1),
+          -1,
+        );
+
+        const newField = {
+          id: maxId + 1,
+          name: `field_${maxId + 1}`,
+          type: "VARCHAR",
+          size: "255",
+          notNull: false,
+          unique: false,
+          primary: false,
+          increment: false,
+          default: "",
+          check: "",
+          comment: "",
+          foreignK: false,
+        };
+
+        const updatedFields = [...table.fields, newField];
+        updateTable(contextMenu.tableId, {
+          fields: updatedFields,
+        });
+
+        Toast.success(t("field_added_success"));
+
+        setSelectedElement({
+          element: ObjectType.TABLE,
+          id: contextMenu.tableId,
+          open: true,
+        });
+      }
+    }
+  };
+
+  const handleDeleteTable = () => {
+    if (contextMenu.tableId !== null) {
+      deleteTable(contextMenu.tableId);
+    }
+  };
+
+  // Field context menu handlers
+  const handleFieldContextMenu = (e, tableId, fieldId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    closeAllContextMenus();
+
+    setFieldContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      tableId: tableId,
+      fieldId: fieldId,
+    });
+  };
+
+  const handleFieldContextMenuClose = () => {
+    setFieldContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      tableId: null,
+      fieldId: null,
+    });
+  };
+
+  const handleEditField = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: fieldContextMenu.tableId,
+          currentTab: Tab.TABLES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_table_${fieldContextMenu.tableId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.TABLE,
+          id: fieldContextMenu.tableId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteField = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        deleteField(field, fieldContextMenu.tableId);
+      }
+    }
+  };
+
+  const handleToggleFieldPrimaryKey = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId
+            ? {
+                ...f,
+                primary: !f.primary,
+                // When setting as primary key, ensure notNull and unique are true
+                notNull: !f.primary ? true : f.notNull,
+                unique: !f.primary ? true : f.unique,
+              }
+            : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldNotNull = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        // If trying to set a primary key as nullable, show warning and don't change
+        if (field.primary && field.notNull) {
+          Toast.info(t("pk_has_not_be_null"));
+          return;
+        }
+
+        // Primary key fields cannot be null, so don't allow setting notNull to false
+        const newNotNull = field.primary ? true : !field.notNull;
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId ? { ...f, notNull: newNotNull } : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldUnique = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        // If trying to remove unique from a primary key, show warning and don't change
+        if (field.primary && field.unique) {
+          Toast.info(t("pk_has_to_be_unique"));
+          return;
+        }
+
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId ? { ...f, unique: !f.unique } : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleToggleFieldAutoIncrement = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+      if (table && field) {
+        const updatedFields = table.fields.map((f) =>
+          f.id === fieldContextMenu.fieldId
+            ? { ...f, increment: !f.increment }
+            : f,
+        );
+        updateTable(fieldContextMenu.tableId, { fields: updatedFields });
+      }
+    }
+  };
+
+  const handleEditRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.RELATIONSHIP,
+          id: relationshipContextMenu.relationshipId,
+          currentTab: Tab.RELATIONSHIPS,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(
+              `scroll_relationship_${relationshipContextMenu.relationshipId}`,
+            )
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.RELATIONSHIP,
+          id: relationshipContextMenu.relationshipId,
+          open: true,
+        }));
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleRenameRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship = relationships.find(
+        (r) => r.id === relationshipContextMenu.relationshipId,
+      );
+      if (relationship) {
+        setRelationshipRenameModal({
+          visible: true,
+          relationshipId: relationshipContextMenu.relationshipId,
+          currentName: relationship.name,
+          newName: relationship.name,
+        });
+        handleRelationshipContextMenuClose();
+      }
+    }
+  };
+
+  const isDefaultRelationshipName = (relationship, tables) => {
+    if (!relationship || !tables) return false;
+
+    const startTable = tables.find((t) => t.id === relationship.startTableId);
+    const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+    if (!startTable || !endTable) return false;
+
+    const startField = startTable.fields?.find(
+      (f) => f.id === relationship.startFieldId,
+    );
+    const endField = endTable.fields?.find(
+      (f) => f.id === relationship.endFieldId,
+    );
+
+    if (!startField || !endField) return false;
+
+    // Check if it matches the original creation pattern: parentTable_parentField
+    const originalPattern = `${startTable.name}_${startField.name}`;
+
+    // Check if it matches the fk pattern: fk_endTable_endField_startTable
+    const fkPattern = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+    return (
+      relationship.name === originalPattern || relationship.name === fkPattern
+    );
+  };
+
+  const handleSwapRelationshipDirection = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const shouldUpdateName = isDefaultRelationshipName(
+          relationship,
+          tables,
+        );
+
+        const undoData = {
+          startTableId: relationship.startTableId,
+          startFieldId: relationship.startFieldId,
+          endTableId: relationship.endTableId,
+          endFieldId: relationship.endFieldId,
+        };
+
+        const redoData = {
+          startTableId: relationship.endTableId,
+          startFieldId: relationship.endFieldId,
+          endTableId: relationship.startTableId,
+          endFieldId: relationship.startFieldId,
+        };
+
+        if (shouldUpdateName) {
+          undoData.name = relationship.name;
+          // Generate the new name after swapping
+          const newStartTable = tables.find(
+            (t) => t.id === relationship.endTableId,
+          );
+          const newEndTable = tables.find(
+            (t) => t.id === relationship.startTableId,
+          );
+          const newEndField = newEndTable?.fields?.find(
+            (f) => f.id === relationship.startFieldId,
+          );
+
+          if (newStartTable && newEndTable && newEndField) {
+            redoData.name = `fk_${newEndTable.name}_${newEndField.name}_${newStartTable.name}`;
+          }
+        }
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: undoData,
+            redo: redoData,
+            message: `Swap direction for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+
+        setRelationships((prev) =>
+          prev.map((e, idx) => {
+            if (idx === relationshipContextMenu.relationshipId) {
+              const updatedRelationship = {
+                ...e,
+                startTableId: e.endTableId,
+                startFieldId: e.endFieldId,
+                endTableId: e.startTableId,
+                endFieldId: e.startFieldId,
+              };
+
+              // Only update name if it's a default name
+              if (shouldUpdateName && redoData.name) {
+                updatedRelationship.name = redoData.name;
+              }
+
+              return updatedRelationship;
+            }
+            return e;
+          }),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleChangeRelationshipType = (newType) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const defaultCardinality =
+          RelationshipCardinalities[newType] &&
+          RelationshipCardinalities[newType][0]
+            ? RelationshipCardinalities[newType][0].label
+            : "";
+
+        // Determine if this is switching to/from subtype
+        const isBecomingSubtype = newType === RelationshipType.SUBTYPE;
+        const wasSubtype =
+          relationship.relationshipType === RelationshipType.SUBTYPE;
+        // Set default subtype_restriction when becoming subtype
+        const defaultSubtypeRestriction = isBecomingSubtype
+          ? SubtypeRestriction.DISJOINT_TOTAL
+          : undefined;
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: {
+              relationshipType: relationship.relationshipType,
+              cardinality: relationship.cardinality,
+              subtype: relationship.subtype,
+              subtype_restriction: relationship.subtype_restriction,
+            },
+            redo: {
+              relationshipType: newType,
+              cardinality: defaultCardinality,
+              subtype: isBecomingSubtype,
+              subtype_restriction: defaultSubtypeRestriction,
+            },
+            message: `Change type for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+
+        // When becoming subtype, convert existing FK fields to primary keys
+        if (isBecomingSubtype && !wasSubtype) {
+          const childTableId = relationship.endTableId;
+          const parentTableId = relationship.startTableId;
+
+          if (childTableId !== undefined && parentTableId !== undefined) {
+            const childTable = tables.find((t) => t.id === childTableId);
+
+            if (childTable) {
+              // Find FK fields that reference the parent table
+              const fkFieldsToPromote = childTable.fields.filter(
+                (field) =>
+                  field.foreignK &&
+                  field.foreignKey &&
+                  field.foreignKey.tableId === parentTableId,
+              );
+
+              if (fkFieldsToPromote.length > 0) {
+                // Update each FK field to be a primary key
+                const updatedFields = childTable.fields.map((field) => {
+                  if (fkFieldsToPromote.some((fk) => fk.id === field.id)) {
+                    return { ...field, primary: true };
+                  }
+                  return field;
+                });
+                // Update the table with the new fields
+                updateTable(childTableId, { fields: updatedFields });
+              }
+            }
+          }
+        }
+
+        setRelationships((prev) =>
+          prev.map((e, idx) =>
+            idx === relationshipContextMenu.relationshipId
+              ? {
+                  ...e,
+                  relationshipType: newType,
+                  cardinality: defaultCardinality,
+                  subtype: isBecomingSubtype,
+                  subtype_restriction: defaultSubtypeRestriction,
+                }
+              : e,
+          ),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleChangeRelationshipCardinality = (newCardinality) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: { cardinality: relationship.cardinality },
+            redo: { cardinality: newCardinality },
+            message: `Change cardinality for ${relationship.name}`,
+          },
+        ]);
+        setRedoStack([]);
+        setRelationships((prev) =>
+          prev.map((e, idx) =>
+            idx === relationshipContextMenu.relationshipId
+              ? { ...e, cardinality: newCardinality }
+              : e,
+          ),
+        );
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleDeleteRelationship = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      deleteRelationship(relationshipContextMenu.relationshipId);
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleDeleteChildFromSubtype = (childTableId) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      removeChildFromSubtype(
+        relationshipContextMenu.relationshipId,
+        childTableId,
+      );
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleToggleRelationshipLabel = (showLabel) => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      updateRelationship(relationshipContextMenu.relationshipId, {
+        showLabel: showLabel,
+      });
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  const handleSetDefaultRelationshipName = () => {
+    if (relationshipContextMenu.relationshipId !== null) {
+      const relationship =
+        relationships[relationshipContextMenu.relationshipId];
+      if (relationship) {
+        const startTable = tables.find(
+          (t) => t.id === relationship.startTableId,
+        );
+        const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+        if (!startTable || !endTable) return;
+
+        const startField = startTable.fields?.find(
+          (f) => f.id === relationship.startFieldId,
+        );
+        const endField = endTable.fields?.find(
+          (f) => f.id === relationship.endFieldId,
+        );
+
+        if (!startField || !endField) return;
+
+        const defaultName = `fk_${endTable.name}_${endField.name}_${startTable.name}`;
+
+        if (relationship.name === defaultName) {
+          handleRelationshipContextMenuClose();
+          return; // Already has default name
+        }
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipContextMenu.relationshipId,
+            undo: { name: relationship.name },
+            redo: { name: defaultName },
+            message: `Set default name for ${defaultName}`,
+          },
+        ]);
+        setRedoStack([]);
+        updateRelationship(relationshipContextMenu.relationshipId, {
+          name: defaultName,
+        });
+      }
+      handleRelationshipContextMenuClose();
+    }
+  };
+
+  // Area context menu handlers
+  const handleAreaContextMenu = (e, areaId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    closeAllContextMenus();
+
+    setAreaContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      areaId: areaId,
+    });
+  };
+
+  const handleAreaContextMenuClose = () => {
+    setAreaContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      areaId: null,
+    });
+  };
+
+  const handleEditArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          currentTab: Tab.AREAS,
+          open: true,
+        }));
+        // Scroll to the area after a brief delay to ensure the tab has switched
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_area_${areaContextMenu.areaId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleRenameArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      const area = areas.find((a) => a.id === areaContextMenu.areaId);
+      if (area) {
+        setAreaRenameModal({
+          visible: true,
+          areaId: areaContextMenu.areaId,
+          currentName: area.name,
+          newName: area.name,
+        });
+      }
+    }
+  };
+
+  const handleAreaRenameConfirm = () => {
+    if (areaRenameModal.areaId !== null && areaRenameModal.newName.trim()) {
+      updateArea(areaRenameModal.areaId, {
+        name: areaRenameModal.newName.trim(),
+      });
+      setAreaRenameModal({
+        visible: false,
+        areaId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success(t("area_renamed_success"));
+    }
+  };
+
+  const handleAreaRenameCancel = () => {
+    setAreaRenameModal({
+      visible: false,
+      areaId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleAreaChangeColor = () => {
+    if (areaContextMenu.areaId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          currentTab: Tab.AREAS,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_area_${areaContextMenu.areaId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.AREA,
+          id: areaContextMenu.areaId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteArea = () => {
+    if (areaContextMenu.areaId !== null) {
+      deleteArea(areaContextMenu.areaId, true);
+      handleAreaContextMenuClose();
+    }
+  };
+
+  // Note context menu handlers
+  const handleNoteContextMenu = (e, noteId, x, y) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    closeAllContextMenus();
+
+    setNoteContextMenu({
+      visible: true,
+      x: x,
+      y: y,
+      noteId: noteId,
+    });
+  };
+
+  const handleNoteContextMenuClose = () => {
+    setNoteContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      noteId: null,
+    });
+  };
+
+  const handleEditNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          currentTab: Tab.NOTES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_note_${noteContextMenu.noteId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleRenameNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      const note = notes.find((n) => n.id === noteContextMenu.noteId);
+      if (note) {
+        setNoteRenameModal({
+          visible: true,
+          noteId: noteContextMenu.noteId,
+          currentName: note.title,
+          newName: note.title,
+        });
+      }
+    }
+  };
+
+  const handleNoteRenameConfirm = () => {
+    if (noteRenameModal.noteId !== null && noteRenameModal.newName.trim()) {
+      updateNote(noteRenameModal.noteId, {
+        title: noteRenameModal.newName.trim(),
+      });
+      setNoteRenameModal({
+        visible: false,
+        noteId: null,
+        currentName: "",
+        newName: "",
+      });
+      Toast.success(t("note_renamed_success"));
+    }
+  };
+
+  const handleNoteRenameCancel = () => {
+    setNoteRenameModal({
+      visible: false,
+      noteId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleFieldRename = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+
+      if (field) {
+        setFieldRenameModal({
+          visible: true,
+          tableId: fieldContextMenu.tableId,
+          fieldId: fieldContextMenu.fieldId,
+          currentName: field.name,
+          newName: field.name,
+        });
+      }
+    }
+    handleFieldContextMenuClose();
+  };
+
+  const handleFieldRenameConfirm = () => {
+    if (
+      fieldRenameModal.tableId !== null &&
+      fieldRenameModal.fieldId !== null &&
+      fieldRenameModal.newName.trim()
+    ) {
+      // Check if this field is part of a foreign key relationship
+      const relatedField = findRelatedForeignKeyField(
+        fieldRenameModal.tableId,
+        fieldRenameModal.fieldId,
+      );
+
+      if (relatedField) {
+        // Show foreign key confirmation modal
+        setForeignKeyRenameModal({
+          visible: true,
+          tableId: fieldRenameModal.tableId,
+          fieldId: fieldRenameModal.fieldId,
+          newName: fieldRenameModal.newName.trim(),
+          relatedField: relatedField,
+        });
+        setFieldRenameModal({
+          visible: false,
+          tableId: null,
+          fieldId: null,
+          currentName: "",
+          newName: "",
+        });
+      } else {
+        // No foreign key relationship, rename directly
+        renameFieldOnly(
+          fieldRenameModal.tableId,
+          fieldRenameModal.fieldId,
+          fieldRenameModal.newName.trim(),
+        );
+        setFieldRenameModal({
+          visible: false,
+          tableId: null,
+          fieldId: null,
+          currentName: "",
+          newName: "",
+        });
+        Toast.success(t("field_renamed_success"));
+      }
+    }
+  };
+
+  const findRelatedForeignKeyField = (tableId, fieldId) => {
+    for (const relationship of relationships) {
+      // Check if this field is the foreign key (start field)
+      if (
+        relationship.startTableId === tableId &&
+        relationship.startFieldId === fieldId
+      ) {
+        const relatedTable = tables.find(
+          (t) => t.id === relationship.endTableId,
+        );
+        const relatedField = relatedTable?.fields.find(
+          (f) => f.id === relationship.endFieldId,
+        );
+        if (relatedTable && relatedField) {
+          return {
+            tableId: relationship.endTableId,
+            fieldId: relationship.endFieldId,
+            tableName: relatedTable.name,
+            fieldName: relatedField.name,
+          };
+        }
+      }
+      // Check if this field is the referenced field (end field)
+      if (
+        relationship.endTableId === tableId &&
+        relationship.endFieldId === fieldId
+      ) {
+        const relatedTable = tables.find(
+          (t) => t.id === relationship.startTableId,
+        );
+        const relatedField = relatedTable?.fields.find(
+          (f) => f.id === relationship.startFieldId,
+        );
+        if (relatedTable && relatedField) {
+          return {
+            tableId: relationship.startTableId,
+            fieldId: relationship.startFieldId,
+            tableName: relatedTable.name,
+            fieldName: relatedField.name,
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const renameFieldOnly = (tableId, fieldId, newName) => {
+    const table = tables.find((t) => t.id === tableId);
+    if (table) {
+      const updatedFields = table.fields.map((f) =>
+        f.id === fieldId ? { ...f, name: newName } : f,
+      );
+      updateTable(tableId, { fields: updatedFields });
+    }
+  };
+
+  const renameBothFields = (
+    tableId,
+    fieldId,
+    newName,
+    relatedTableId,
+    relatedFieldId,
+  ) => {
+    // Rename the original field
+    renameFieldOnly(tableId, fieldId, newName);
+    // Rename the related field
+    renameFieldOnly(relatedTableId, relatedFieldId, newName);
+
+    // Update relationship names to default when foreign key fields are renamed
+    updateRelationshipNamesAfterFieldRename(
+      tableId,
+      fieldId,
+      newName,
+      relatedTableId,
+      relatedFieldId,
+      newName,
+    );
+  };
+
+  const updateRelationshipNamesAfterFieldRename = (
+    tableId,
+    fieldId,
+    newFieldName,
+    relatedTableId,
+    relatedFieldId,
+    relatedNewFieldName,
+  ) => {
+    // Find relationships that involve these fields
+    const relatedRelationships = relationships.filter(
+      (r) =>
+        (r.startTableId === tableId && r.startFieldId === fieldId) ||
+        (r.endTableId === tableId && r.endFieldId === fieldId) ||
+        (r.startTableId === relatedTableId &&
+          r.startFieldId === relatedFieldId) ||
+        (r.endTableId === relatedTableId && r.endFieldId === relatedFieldId),
+    );
+
+    // Update each relationship with a new default name
+    relatedRelationships.forEach((relationship) => {
+      const startTable = tables.find((t) => t.id === relationship.startTableId);
+      const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+      if (startTable && endTable) {
+        // Determine the field name to use based on which field was renamed
+        let endFieldName, startTableName, endTableName;
+
+        if (
+          relationship.endTableId === tableId &&
+          relationship.endFieldId === fieldId
+        ) {
+          // The end field was renamed
+          endFieldName = newFieldName;
+        } else if (
+          relationship.endTableId === relatedTableId &&
+          relationship.endFieldId === relatedFieldId
+        ) {
+          // The related end field was renamed
+          endFieldName = relatedNewFieldName;
+        } else {
+          // Use current field name
+          const endField = endTable.fields?.find(
+            (f) => f.id === relationship.endFieldId,
+          );
+          endFieldName = endField?.name;
+        }
+
+        startTableName = startTable.name;
+        endTableName = endTable.name;
+
+        if (endFieldName && startTableName && endTableName) {
+          const defaultName = `fk_${endTableName}_${endFieldName}_${startTableName}`;
+
+          // Only update if the name is different
+          if (relationship.name !== defaultName) {
+            updateRelationship(relationship.id, { name: defaultName });
+          }
+        }
+      }
+    });
+  };
+
+  const updateRelationshipNamesAfterSingleFieldRename = (
+    tableId,
+    fieldId,
+    newFieldName,
+  ) => {
+    // Find relationships that involve this field
+    const relatedRelationships = relationships.filter(
+      (r) =>
+        (r.startTableId === tableId && r.startFieldId === fieldId) ||
+        (r.endTableId === tableId && r.endFieldId === fieldId),
+    );
+
+    // Update each relationship with a new default name
+    relatedRelationships.forEach((relationship) => {
+      const startTable = tables.find((t) => t.id === relationship.startTableId);
+      const endTable = tables.find((t) => t.id === relationship.endTableId);
+
+      if (startTable && endTable) {
+        // Determine the field name to use
+        let endFieldName, startTableName, endTableName;
+
+        if (
+          relationship.endTableId === tableId &&
+          relationship.endFieldId === fieldId
+        ) {
+          // The end field was renamed
+          endFieldName = newFieldName;
+        } else {
+          // Use current field name
+          const endField = endTable.fields?.find(
+            (f) => f.id === relationship.endFieldId,
+          );
+          endFieldName = endField?.name;
+        }
+
+        startTableName = startTable.name;
+        endTableName = endTable.name;
+
+        if (endFieldName && startTableName && endTableName) {
+          const defaultName = `fk_${endTableName}_${endFieldName}_${startTableName}`;
+
+          // Only update if the name is different
+          if (relationship.name !== defaultName) {
+            updateRelationship(relationship.id, { name: defaultName });
+          }
+        }
+      }
+    });
+  };
+
+  const handleForeignKeyRenameYes = () => {
+    if (
+      foreignKeyRenameModal.tableId !== null &&
+      foreignKeyRenameModal.fieldId !== null
+    ) {
+      renameBothFields(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+        foreignKeyRenameModal.relatedField.tableId,
+        foreignKeyRenameModal.relatedField.fieldId,
+      );
+      setForeignKeyRenameModal({
+        visible: false,
+        tableId: null,
+        fieldId: null,
+        newName: "",
+        relatedField: null,
+      });
+      Toast.success(t("both_fields_renamed_success"));
+    }
+  };
+
+  const handleForeignKeyRenameNo = () => {
+    if (
+      foreignKeyRenameModal.tableId !== null &&
+      foreignKeyRenameModal.fieldId !== null
+    ) {
+      renameFieldOnly(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+      );
+
+      // Update relationship names when only one field is renamed
+      updateRelationshipNamesAfterSingleFieldRename(
+        foreignKeyRenameModal.tableId,
+        foreignKeyRenameModal.fieldId,
+        foreignKeyRenameModal.newName,
+      );
+
+      setForeignKeyRenameModal({
+        visible: false,
+        tableId: null,
+        fieldId: null,
+        newName: "",
+        relatedField: null,
+      });
+      Toast.success(t("field_renamed_success"));
+    }
+  };
+
+  const handleForeignKeyRenameCancel = () => {
+    setForeignKeyRenameModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      newName: "",
+      relatedField: null,
+    });
+  };
+
+  const foreignKeyRenameFooter = [
+    <button
+      key="cancel"
+      className="px-3 py-2 mr-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+      onClick={handleForeignKeyRenameCancel}
+    >
+      Cancel
+    </button>,
+    <button
+      key="no"
+      className="px-3 py-2 mr-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+      onClick={handleForeignKeyRenameNo}
+    >
+      No, rename only this field
+    </button>,
+    <button
+      key="yes"
+      className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+      onClick={handleForeignKeyRenameYes}
+    >
+      Yes, rename both fields
+    </button>,
+  ];
+
+  const handleFieldRenameCancel = () => {
+    setFieldRenameModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      currentName: "",
+      newName: "",
+    });
+  };
+
+  const handleEditNoteContent = () => {
+    if (noteContextMenu.noteId !== null) {
+      // Focus on the textarea for the note
+      const textarea = document.getElementById(
+        `note_${noteContextMenu.noteId}`,
+      );
+      if (textarea) {
+        textarea.focus();
+      }
+    }
+  };
+
+  const handleNoteChangeColor = () => {
+    if (noteContextMenu.noteId !== null) {
+      if (layout.sidebar) {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          currentTab: Tab.NOTES,
+          open: true,
+        }));
+        setTimeout(() => {
+          document
+            .getElementById(`scroll_note_${noteContextMenu.noteId}`)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        setSelectedElement((prev) => ({
+          ...prev,
+          element: ObjectType.NOTE,
+          id: noteContextMenu.noteId,
+          open: true,
+        }));
+      }
+    }
+  };
+
+  const handleDeleteNote = () => {
+    if (noteContextMenu.noteId !== null) {
+      deleteNote(noteContextMenu.noteId, true);
+      handleNoteContextMenuClose();
+    }
+  };
+
+  // Canvas context menu handlers
+  const handleCanvasContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    closeAllContextMenus();
+
+    // Convert screen coordinates to canvas coordinates
+    const screenX = e.clientX;
+    const screenY = e.clientY;
+
+    // Store diagram coordinates at the time of right-click
+    const diagramX = pointer.spaces.diagram.x;
+    const diagramY = pointer.spaces.diagram.y;
+
+    setCanvasContextMenu({
+      visible: true,
+      x: screenX,
+      y: screenY,
+      diagramX: diagramX,
+      diagramY: diagramY,
+    });
+  };
+
+  const handleCanvasContextMenuClose = () => {
+    setCanvasContextMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+      diagramX: 0,
+      diagramY: 0,
+    });
+  };
+
+  const handleCanvasAddTable = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Store the current transform pan values for restoration
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place table at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the table (it will use the updated transform.pan values)
+    addTable();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasAddArea = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Store the current transform pan values for restoration
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place area at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the area (it will use the updated transform.pan values)
+    addArea();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasAddNote = () => {
+    // Get stored diagram coordinates from when context menu was opened
+    const targetX = canvasContextMenu.diagramX;
+    const targetY = canvasContextMenu.diagramY;
+
+    // Store the current transform pan values for restoration
+    const originalPan = { ...transform.pan };
+
+    // Update transform to place note at right-click position
+    setTransform((prev) => ({
+      ...prev,
+      pan: { x: targetX, y: targetY },
+    }));
+
+    // Add the note (it will use the updated transform.pan values)
+    addNote();
+
+    // Restore original transform pan immediately
+    setTransform((prev) => ({
+      ...prev,
+      pan: originalPan,
+    }));
+  };
+
+  const handleCanvasUndo = () => {
+    // Simplified undo logic - for basic operations
+    if (undoStack.length === 0) return;
+    const a = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.filter((_, i) => i !== prev.length - 1));
+
+    if (a.action === Action.ADD) {
+      if (a.element === ObjectType.TABLE) {
+        const tableIdToDelete =
+          tables.length > 0 ? tables[tables.length - 1].id : null;
+        if (tableIdToDelete !== null) {
+          deleteTable(tableIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.AREA) {
+        const areaIdToDelete = areas.length > 0 ? areas.length - 1 : null;
+        if (areaIdToDelete !== null) {
+          deleteArea(areaIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.NOTE) {
+        const noteIdToDelete = notes.length > 0 ? notes.length - 1 : null;
+        if (noteIdToDelete !== null) {
+          deleteNote(noteIdToDelete, false);
+        }
+      } else if (a.element === ObjectType.RELATIONSHIP) {
+        const relationshipIdToDelete =
+          relationships.length > 0 ? relationships.length - 1 : null;
+        if (relationshipIdToDelete !== null) {
+          deleteRelationship(relationshipIdToDelete, false);
+        }
+      }
+      setRedoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.EDIT) {
+      if (a.element === ObjectType.AREA && a.aid !== undefined) {
+        updateArea(a.aid, a.undo);
+      } else if (a.element === ObjectType.NOTE && a.nid !== undefined) {
+        updateNote(a.nid, a.undo);
+      } else if (a.element === ObjectType.TABLE && a.tid !== undefined) {
+        updateTable(a.tid, a.undo);
+      } else if (a.element === ObjectType.RELATIONSHIP && a.rid !== undefined) {
+        updateRelationship(a.rid, a.undo, false);
+      }
+      setRedoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.MOVE) {
+      // Handle MOVE operations
+      if (Array.isArray(a.id)) {
+        // Multiple element move
+        if (a.initialPositions) {
+          Object.entries(a.initialPositions).forEach(([id, pos]) => {
+            const elementId = parseInt(id);
+            if (a.element === ObjectType.TABLE) {
+              updateTable(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.AREA) {
+              updateArea(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.NOTE) {
+              updateNote(elementId, { x: pos.x, y: pos.y });
+            }
+          });
+        }
+      } else {
+        // Single element move
+        if (a.from) {
+          if (a.element === ObjectType.TABLE) {
+            updateTable(a.id, { x: a.from.x, y: a.from.y });
+          } else if (a.element === ObjectType.AREA) {
+            updateArea(a.id, { x: a.from.x, y: a.from.y });
+          } else if (a.element === ObjectType.NOTE) {
+            updateNote(a.id, { x: a.from.x, y: a.from.y });
+          }
+        }
+      }
+      setRedoStack((prev) => [...prev, a]);
+    }
+  };
+
+  const handleCanvasRedo = () => {
+    // Simplified redo logic - for basic operations
+    if (redoStack.length === 0) return;
+    const a = redoStack[redoStack.length - 1];
+    setRedoStack((prev) => prev.filter((_, i) => i !== prev.length - 1));
+
+    if (a.action === Action.ADD) {
+      if (a.element === ObjectType.TABLE) {
+        addTable();
+      } else if (a.element === ObjectType.AREA) {
+        addArea();
+      } else if (a.element === ObjectType.NOTE) {
+        addNote();
+      } else if (a.element === ObjectType.RELATIONSHIP) {
+        // For relationship redo, we need the relationship data
+        if (a.data && a.data.relationship) {
+          addRelationship(
+            a.data.relationship,
+            a.data.autoGeneratedFkFields,
+            a.data.childTableIdWithGeneratedFks,
+            false,
+          );
+        }
+      }
+      setUndoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.EDIT) {
+      if (a.element === ObjectType.AREA && a.aid !== undefined) {
+        updateArea(a.aid, a.redo);
+      } else if (a.element === ObjectType.NOTE && a.nid !== undefined) {
+        updateNote(a.nid, a.redo);
+      } else if (a.element === ObjectType.TABLE && a.tid !== undefined) {
+        updateTable(a.tid, a.redo);
+      } else if (a.element === ObjectType.RELATIONSHIP && a.rid !== undefined) {
+        updateRelationship(a.rid, a.redo, false);
+      }
+      setUndoStack((prev) => [...prev, a]);
+    } else if (a.action === Action.MOVE) {
+      // Handle MOVE operations for redo
+      if (Array.isArray(a.id)) {
+        // Multiple element move
+        if (a.finalPositions) {
+          Object.entries(a.finalPositions).forEach(([id, pos]) => {
+            const elementId = parseInt(id);
+            if (a.element === ObjectType.TABLE) {
+              updateTable(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.AREA) {
+              updateArea(elementId, { x: pos.x, y: pos.y });
+            } else if (a.element === ObjectType.NOTE) {
+              updateNote(elementId, { x: pos.x, y: pos.y });
+            }
+          });
+        }
+      } else {
+        // Single element move
+        if (a.to) {
+          if (a.element === ObjectType.TABLE) {
+            updateTable(a.id, { x: a.to.x, y: a.to.y });
+          } else if (a.element === ObjectType.AREA) {
+            updateArea(a.id, { x: a.to.x, y: a.to.y });
+          } else if (a.element === ObjectType.NOTE) {
+            updateNote(a.id, { x: a.to.x, y: a.to.y });
+          }
+        }
+      }
+      setUndoStack((prev) => [...prev, a]);
+    }
+  };
+
+  const handleCanvasStartAreaSelection = () => {
+    // Start area selection mode - wait for user to click and drag
+    setIsAreaSelecting(true);
+    setIsDrawingSelectionArea(false);
+
+    // Change pointer style to indicate selection mode
+    pointer.setStyle("crosshair");
+  };
+
   /**
    * @param {PointerEvent} e
    * @param {*} id
    * @param {ObjectType[keyof ObjectType]} type
    */
   const handlePointerDownOnElement = (e, id, type) => {
+    // Unified context menu close handler
+    const closeAllContextMenus = () => {
+      handleContextMenuClose && handleContextMenuClose();
+      handleRelationshipContextMenuClose &&
+        handleRelationshipContextMenuClose();
+      handleAreaContextMenuClose && handleAreaContextMenuClose();
+      handleNoteContextMenuClose && handleNoteContextMenuClose();
+      handleCanvasContextMenuClose && handleCanvasContextMenuClose();
+      handleFieldContextMenuClose && handleFieldContextMenuClose();
+    };
+
+    if (e.button === 0) {
+      closeAllContextMenus();
+    }
+
     if (selectedElement.open && !layout.sidebar) return;
     if (!e.isPrimary) return;
 
     // Verify if already selected (for multiple selection)
-    const alreadySelected =
-      Array.isArray(selectedElement.id)
-        ? selectedElement.id.includes(id)
-        : selectedElement.id === id;
+    const alreadySelected = Array.isArray(selectedElement.id)
+      ? selectedElement.id.includes(id)
+      : selectedElement.id === id;
 
-        let elementData;
+    let elementData;
     if (type === ObjectType.TABLE) {
       const table = tables.find((t) => t.id === id);
 
@@ -160,12 +1942,12 @@ export default function Canvas() {
         y: table.y - pointer.spaces.diagram.y,
       });
 
-  // expose table as elementData so common logic below (multi-select handling)
-  // can use it the same way as AREA/NOTE branches do
-  elementData = table;
+      // expose table as elementData so common logic below (multi-select handling)
+      // can use it the same way as AREA/NOTE branches do
+      elementData = table;
 
       let width = table.width || settings.tableWidth;
-      if (table.x - pointer.spaces.diagram.x < - width + 15) {
+      if (table.x - pointer.spaces.diagram.x < -width + 15) {
         setResizing({
           element: type,
           id: id,
@@ -239,7 +2021,7 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
-    if (isAreaSelecting) {
+    if (isAreaSelecting && isDrawingSelectionArea) {
       const currentX = pointer.spaces.diagram.x;
       const currentY = pointer.spaces.diagram.y;
       setSelectionArea((prev) => ({
@@ -249,7 +2031,6 @@ export default function Canvas() {
         width: Math.abs(currentX - prev.startX),
         height: Math.abs(currentY - prev.startY),
       }));
-      // Only update the area, without finalizing it yet.
       return;
     }
 
@@ -261,9 +2042,9 @@ export default function Canvas() {
       });
     } else if (resizing.element === ObjectType.TABLE && resizing.id >= 0) {
       const table = tables.find((t) => t.id === resizing.id);
-      const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180)
+      const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180);
       updateTable(resizing.id, {
-        width: newWidth
+        width: newWidth,
       });
     } else if (hierarchyLinking) {
       setHierarchyLinkingLine({
@@ -364,6 +2145,36 @@ export default function Canvas() {
    * @param {PointerEvent} e
    */
   const handlePointerDown = (e) => {
+    if (contextMenu.visible && e.button === 0) {
+      handleContextMenuClose();
+    }
+
+    if (relationshipContextMenu.visible && e.button === 0) {
+      handleRelationshipContextMenuClose();
+    }
+
+    if (areaContextMenu.visible && e.button === 0) {
+      handleAreaContextMenuClose();
+    }
+
+    if (noteContextMenu.visible && e.button === 0) {
+      handleNoteContextMenuClose();
+    }
+
+    if (canvasContextMenu.visible && e.button === 0) {
+      handleCanvasContextMenuClose();
+    }
+
+    if (fieldContextMenu.visible && e.button === 0) {
+      handleFieldContextMenuClose();
+    }
+
+    // Handle right-click on canvas background for context menu
+    if (e.button === 2 && e.target.id === "diagram") {
+      handleCanvasContextMenu(e);
+      return;
+    }
+
     if (e.isPrimary && e.target.id === "diagram") {
       // if the user clicks on the background, reset the selected element
       // desactivate area selection and move mode
@@ -386,19 +2197,46 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
+    // If in area selection mode, start drawing the selection area
+    if (isAreaSelecting && !isDrawingSelectionArea && e.button === 0) {
+      setIsDrawingSelectionArea(true);
+      setSelectionArea({
+        startX: pointer.spaces.diagram.x,
+        startY: pointer.spaces.diagram.y,
+        x: pointer.spaces.diagram.x,
+        y: pointer.spaces.diagram.y,
+        width: 0,
+        height: 0,
+      });
+      return;
+    }
+
     // If pressing Alt + left click, start area selection
     if (e.altKey && e.button === 0) {
       setIsAreaSelecting(true);
+      setIsDrawingSelectionArea(true);
       setSelectionArea({
-          startX: pointer.spaces.diagram.x,
-          startY: pointer.spaces.diagram.y,
-          x: pointer.spaces.diagram.x,
-          y: pointer.spaces.diagram.y,
-          width: 0,
-          height: 0,
+        startX: pointer.spaces.diagram.x,
+        startY: pointer.spaces.diagram.y,
+        x: pointer.spaces.diagram.x,
+        y: pointer.spaces.diagram.y,
+        width: 0,
+        height: 0,
       });
       return;
-  }
+    }
+
+    // Cancel area selection if clicking without being in drawing mode (but not if Alt is pressed)
+    if (
+      isAreaSelecting &&
+      !isDrawingSelectionArea &&
+      e.button === 0 &&
+      !e.altKey
+    ) {
+      setIsAreaSelecting(false);
+      pointer.setStyle("default");
+      return;
+    }
 
     // don't pan if the sidesheet for editing a table is open
     if (
@@ -432,7 +2270,9 @@ export default function Canvas() {
       return dragging.id.some((id) => {
         const table = tables.find((t) => t.id === id);
         const initPos = dragging.initialPositions?.[id];
-        return table && initPos ? !(initPos.x === table.x && initPos.y === table.y) : false;
+        return table && initPos
+          ? !(initPos.x === table.x && initPos.y === table.y)
+          : false;
       });
     }
 
@@ -565,14 +2405,17 @@ export default function Canvas() {
 
     if (!e.isPrimary) return;
 
-    if (isAreaSelecting) {
+    if (isAreaSelecting && isDrawingSelectionArea) {
       const areaBBox = selectionArea;
       // Select tables that intersect the selection area (any part of table)
       const selectedTables = tables.filter((table) => {
         const tableX = table.x;
         const tableY = table.y;
         const tableWidth = table.width || settings.tableWidth;
-        const tableHeight = (table.fields?.length || 0) * tableFieldHeight + tableHeaderHeight + 7;
+        const tableHeight =
+          (table.fields?.length || 0) * tableFieldHeight +
+          tableHeaderHeight +
+          7;
 
         const tableRect = {
           x: tableX,
@@ -604,68 +2447,87 @@ export default function Canvas() {
           id: selectedTables.map((t) => t.id),
           open: false,
         });
+
+        // Set up dragging state for the selected tables
+        setDragging({
+          element: ObjectType.TABLE,
+          id: selectedTables.map((t) => t.id),
+          prevX: selectedTables[0].x, // Use first table as reference
+          prevY: selectedTables[0].y,
+        });
+
         // set start point for dragging
         setDragStart({
           x: pointer.spaces.diagram.x,
           y: pointer.spaces.diagram.y,
-        })
+        });
       }
+      // Reset area selection states and restore pointer style
       setIsAreaSelecting(false);
+      setIsDrawingSelectionArea(false);
+      pointer.setStyle("default");
       return;
     }
 
     if (coordsDidUpdate(dragging.element)) {
-    const info = getMovedElementDetails();
-    // Use pushUndo to ensure centralized filtering/deduplication
-    pushUndo((() => {
-  if (Array.isArray(dragging.id)) {
+      const info = getMovedElementDetails();
+      // Use pushUndo to ensure centralized filtering/deduplication
+      pushUndo(
+        (() => {
+          if (Array.isArray(dragging.id)) {
+            // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
+            const originalPositionsArray =
+              dragging.initialPositions &&
+              typeof dragging.initialPositions === "object"
+                ? // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
+                  dragging.id.map((id) => {
+                    const pos = dragging.initialPositions[id];
+                    return pos
+                      ? { id, x: pos.x, y: pos.y }
+                      : { id, x: 0, y: 0 };
+                  })
+                : dragging.id.map((id) => {
+                    const t = tables.find((tt) => tt.id === id);
+                    return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
+                  });
 
-        // Build arrays matching ControlPanel's expected shape: originalPositions/newPositions
-        const originalPositionsArray = (dragging.initialPositions && typeof dragging.initialPositions === 'object')
-        // Preserve the dragging.id ordering to match finalPositionsArray and ControlPanel expectations
-        ? dragging.id.map((id) => {
-          const pos = dragging.initialPositions[id];
-          return pos ? { id, x: pos.x, y: pos.y } : { id, x: 0, y: 0 };
-          })
-        : dragging.id.map((id) => {
-          const t = tables.find(tt => tt.id === id);
-          return t ? { id, x: t.x, y: t.y } : { id, x: 0, y: 0 };
-          });
+            const finalPositionsArray = dragging.id
+              .map((id) => {
+                const table = tables.find((t) => t.id === id);
+                return table ? { id, x: table.x, y: table.y } : null;
+              })
+              .filter(Boolean);
 
-        const finalPositionsArray = dragging.id.map((id) => {
-          const table = tables.find((t) => t.id === id);
-          return table ? { id, x: table.x, y: table.y } : null;
-        }).filter(Boolean);
-
-        const newAction = {
-          action: Action.MOVE,
-          element: dragging.element,
-          // originalPositions = positions before the move
-          originalPositions: originalPositionsArray,
-          // newPositions = positions after the move
-          newPositions: finalPositionsArray,
-          id: dragging.id,
-          message: t("move_element", {
-            coords: `(${info.x}, ${info.y})`,
-            name: info.name,
-          }),
-        };
-        return newAction;
-      }
-      const newAction = {
-        action: Action.MOVE,
-        element: dragging.element,
-        from: { x: dragging.prevX, y: dragging.prevY },
-        to: { x: info.x, y: info.y },
-        id: dragging.id,
-        message: t("move_element", {
-          coords: `(${info.x}, ${info.y})`,
-          name: info.name,
-        }),
-      };
-      return newAction;
-    })());
-    setRedoStack([]);
+            const newAction = {
+              action: Action.MOVE,
+              element: dragging.element,
+              // originalPositions = positions before the move
+              originalPositions: originalPositionsArray,
+              // newPositions = positions after the move
+              newPositions: finalPositionsArray,
+              id: dragging.id,
+              message: t("move_element", {
+                coords: `(${info.x}, ${info.y})`,
+                name: info.name,
+              }),
+            };
+            return newAction;
+          }
+          const newAction = {
+            action: Action.MOVE,
+            element: dragging.element,
+            from: { x: dragging.prevX, y: dragging.prevY },
+            to: { x: info.x, y: info.y },
+            id: dragging.id,
+            message: t("move_element", {
+              coords: `(${info.x}, ${info.y})`,
+              name: info.name,
+            }),
+          };
+          return newAction;
+        })(),
+      );
+      setRedoStack([]);
     }
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setResizing({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
@@ -727,12 +2589,12 @@ export default function Canvas() {
   };
 
   const handleGripField = (field, fieldTableid) => {
-      // A field can be a foreign key only if it's a primary key or both NOT NULL and UNIQUE.
-      // If it can't be selected, show an error message and exit.
-      if (!field.primary && !(field.notNull && field.unique)) {
-        Toast.info(t("cannot_fk"));
-        return;
-      }
+    // A field can be a foreign key only if it's a primary key or both NOT NULL and UNIQUE.
+    // If it can't be selected, show an error message and exit.
+    if (!field.primary && !(field.notNull && field.unique)) {
+      Toast.info(t("cannot_fk"));
+      return;
+    }
     setPanning((old) => ({ ...old, isPanning: false }));
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setLinkingLine({
@@ -756,12 +2618,10 @@ export default function Canvas() {
     const parentTable = tables.find((t) => t.id === linkingLine.startTableId);
 
     if (!parentTable) {
-      console.error("Parent table not found for linking.");
       setLinking(false);
       return;
     }
     if (!childTable) {
-      console.error("Child table not found for linking.");
       setLinking(false);
       return;
     }
@@ -787,11 +2647,17 @@ export default function Canvas() {
         rel.startTableId === linkingLine.startTableId &&
         rel.endTableId === hoveredTable.tableId &&
         rel.startFieldId === linkingLine.startFieldId &&
-        rel.endFieldId === (parentFields.map(
-          (field, index) =>
-            childTable.fields.reduce(
-              (maxId, f) =>
-                Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index)[0])
+        rel.endFieldId ===
+          parentFields.map(
+            (field, index) =>
+              childTable.fields.reduce(
+                (maxId, f) =>
+                  Math.max(maxId, typeof f.id === "number" ? f.id : -1),
+                -1,
+              ) +
+              1 +
+              index,
+          )[0],
     );
     if (alreadyLinked) {
       Toast.info(t("duplicate_relationship"));
@@ -817,7 +2683,13 @@ export default function Canvas() {
         tableId: parentTable.id,
         fieldId: field.id,
       },
-      id: childTable.fields.reduce((maxId, f) => Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index,
+      id:
+        childTable.fields.reduce(
+          (maxId, f) => Math.max(maxId, typeof f.id === "number" ? f.id : -1),
+          -1,
+        ) +
+        1 +
+        index,
     }));
     // Concatenate the existing fields with the new fields
     const updatedChildFields = [...childTable.fields, ...newFields];
@@ -826,8 +2698,9 @@ export default function Canvas() {
       fields: updatedChildFields,
     });
     const actualStartFieldId = parentTable.fields.find(
-      (f) => f.id === linkingLine.startFieldId);
-    const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : 'table'}`;
+      (f) => f.id === linkingLine.startFieldId,
+    );
+    const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : "table"}`;
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -835,7 +2708,8 @@ export default function Canvas() {
       endTableId: hoveredTable.tableId,
       endFieldId: newFields.length > 0 ? newFields[0].id : undefined,
       relationshipType: RelationshipType.ONE_TO_ONE, // Default, can be changed by editing the relationship
-      cardinality: RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
+      cardinality:
+        RelationshipCardinalities[RelationshipType.ONE_TO_ONE][0].label,
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
@@ -880,10 +2754,16 @@ export default function Canvas() {
       const mouseX = hierarchyLinkingLine.endX;
       const mouseY = hierarchyLinkingLine.endY;
       for (let table of tables) {
-        if (mouseX >= table.x &&
-            mouseX <= table.x + settings.tableWidth &&
-            mouseY >= table.y &&
-            mouseY <= table.y + (tableHeaderHeight + table.fields.length * tableFieldHeight + tableColorStripHeight)) {
+        if (
+          mouseX >= table.x &&
+          mouseX <= table.x + settings.tableWidth &&
+          mouseY >= table.y &&
+          mouseY <=
+            table.y +
+              (tableHeaderHeight +
+                table.fields.length * tableFieldHeight +
+                tableColorStripHeight)
+        ) {
           targetTableId = table.id;
           break;
         }
@@ -893,7 +2773,9 @@ export default function Canvas() {
       return;
     }
     // Find the original relationship
-    const originalRelationship = relationships.find(r => r.id === hierarchyLinkingLine.relationshipId);
+    const originalRelationship = relationships.find(
+      (r) => r.id === hierarchyLinkingLine.relationshipId,
+    );
     if (!originalRelationship) {
       setHierarchyLinking(false);
       return;
@@ -906,11 +2788,16 @@ export default function Canvas() {
     }
 
     // Verify that the table is not already included (as parent or child)
-    const existingChildren = originalRelationship.endTableIds ||
-      (originalRelationship.endTableId !== undefined && originalRelationship.endTableId !== null
+    const existingChildren =
+      originalRelationship.endTableIds ||
+      (originalRelationship.endTableId !== undefined &&
+      originalRelationship.endTableId !== null
         ? [originalRelationship.endTableId]
         : []);
-    const allRelatedTables = [originalRelationship.startTableId, ...existingChildren].filter(id => id !== undefined && id !== null);
+    const allRelatedTables = [
+      originalRelationship.startTableId,
+      ...existingChildren,
+    ].filter((id) => id !== undefined && id !== null);
     if (allRelatedTables.includes(targetTableId)) {
       setHierarchyLinking(false);
       return;
@@ -919,8 +2806,7 @@ export default function Canvas() {
     addChildToSubtype(hierarchyLinkingLine.relationshipId, targetTableId);
     setHierarchyLinking(false);
     // Force a re-render to ensure UI updates properly
-    setTimeout(() => {
-    }, 100);
+    setTimeout(() => {}, 100);
   };
 
   // Handle mouse wheel scrolling
@@ -974,6 +2860,8 @@ export default function Canvas() {
     if (e.key === "Alt") {
       // deactivate area selection
       setIsAreaSelecting(false);
+      setIsDrawingSelectionArea(false);
+      pointer.setStyle("default");
     }
   });
   const theme = localStorage.getItem("theme");
@@ -1023,6 +2911,7 @@ export default function Canvas() {
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
+          onContextMenu={handleCanvasContextMenu}
           className="absolute w-full h-full touch-none"
           viewBox={`${viewBox.left} ${viewBox.top} ${viewBox.width} ${viewBox.height}`}
         >
@@ -1033,6 +2922,7 @@ export default function Canvas() {
               onPointerDown={(e) =>
                 handlePointerDownOnElement(e, a.id, ObjectType.AREA)
               }
+              onContextMenu={handleAreaContextMenu}
               setResize={setAreaResize}
               setInitCoords={setInitCoords}
             />
@@ -1040,12 +2930,20 @@ export default function Canvas() {
           {relationships
             .filter((rel) => {
               // For subtype relationships with single child, render normally
-              if (rel.subtype && rel.endTableId !== undefined && !rel.endTableIds) {
+              if (
+                rel.subtype &&
+                rel.endTableId !== undefined &&
+                !rel.endTableIds
+              ) {
                 return true;
               }
               // For subtype relationships with multiple children, only render the parent relationship
               // (it will handle rendering individual lines internally)
-              if (rel.subtype && rel.endTableIds && rel.endTableIds.length > 1) {
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length > 1
+              ) {
                 return true;
               }
               // For non-subtype relationships, render normally
@@ -1053,18 +2951,23 @@ export default function Canvas() {
                 return true;
               }
               // For subtype relationships with single child in array format, render normally
-              if (rel.subtype && rel.endTableIds && rel.endTableIds.length === 1) {
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length === 1
+              ) {
                 return true;
               }
               return true;
             })
             .map((e, i) => (
-            <Relationship
-              key={e.id || i}
-              data={e}
-              onConnectSubtypePoint={handleSubtypePointClick}
-            />
-          ))}
+              <Relationship
+                key={e.id || i}
+                data={e}
+                onContextMenu={handleRelationshipContextMenu}
+                onConnectSubtypePoint={handleSubtypePointClick}
+              />
+            ))}
           {tables.map((table) => {
             const isMoving =
               dragging.element === ObjectType.TABLE &&
@@ -1082,21 +2985,25 @@ export default function Canvas() {
                 onPointerDown={(e) =>
                   handlePointerDownOnElement(e, table.id, ObjectType.TABLE)
                 }
+                onContextMenu={handleTableContextMenu}
+                onFieldContextMenu={handleFieldContextMenu}
               />
             );
           })}
-          {/*Draw the selection areas*/
-          isAreaSelecting && (
-            <rect
-              x={selectionArea.x}
-              y={selectionArea.y}
-              width={selectionArea.width}
-              height={selectionArea.height}
-              fill="rgba(99, 152, 191, 0.3)"
-              stroke="rgb(99, 152, 191)"
-              strokeWidth="2"
-            />
-          )}
+          {
+            /*Draw the selection areas*/
+            isAreaSelecting && isDrawingSelectionArea && (
+              <rect
+                x={selectionArea.x}
+                y={selectionArea.y}
+                width={selectionArea.width}
+                height={selectionArea.height}
+                fill="rgba(99, 152, 191, 0.3)"
+                stroke="rgb(99, 152, 191)"
+                strokeWidth="2"
+              />
+            )
+          }
           {linking && (
             <path
               d={`M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`}
@@ -1121,6 +3028,7 @@ export default function Canvas() {
               onPointerDown={(e) =>
                 handlePointerDownOnElement(e, n.id, ObjectType.NOTE)
               }
+              onContextMenu={handleNoteContextMenu}
             />
           ))}
         </svg>
@@ -1195,6 +3103,327 @@ export default function Canvas() {
           </table>
         </div>
       )}
+
+      <TableContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={handleContextMenuClose}
+        onEdit={handleEditTable}
+        onDelete={handleDeleteTable}
+        onAddField={handleAddField}
+        onRename={handleRenameTable}
+      />
+
+      <RelationshipContextMenu
+        visible={relationshipContextMenu.visible}
+        x={relationshipContextMenu.x}
+        y={relationshipContextMenu.y}
+        onClose={handleRelationshipContextMenuClose}
+        onEdit={handleEditRelationship}
+        onDelete={handleDeleteRelationship}
+        onRename={handleRenameRelationship}
+        onSwapDirection={handleSwapRelationshipDirection}
+        onChangeType={handleChangeRelationshipType}
+        onChangeCardinality={handleChangeRelationshipCardinality}
+        onSetDefaultName={handleSetDefaultRelationshipName}
+        onDeleteChild={handleDeleteChildFromSubtype}
+        onToggleLabel={handleToggleRelationshipLabel}
+        relationshipData={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]
+            : null
+        }
+        tables={tables}
+        currentType={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]
+                ?.relationshipType
+            : null
+        }
+        currentCardinality={
+          relationshipContextMenu.relationshipId !== null
+            ? relationships[relationshipContextMenu.relationshipId]?.cardinality
+            : null
+        }
+      />
+
+      <AreaContextMenu
+        visible={areaContextMenu.visible}
+        x={areaContextMenu.x}
+        y={areaContextMenu.y}
+        onClose={handleAreaContextMenuClose}
+        onEdit={handleEditArea}
+        onDelete={handleDeleteArea}
+        onRename={handleRenameArea}
+        onChangeColor={handleAreaChangeColor}
+      />
+
+      <NoteContextMenu
+        visible={noteContextMenu.visible}
+        x={noteContextMenu.x}
+        y={noteContextMenu.y}
+        onClose={handleNoteContextMenuClose}
+        onEdit={handleEditNote}
+        onDelete={handleDeleteNote}
+        onRename={handleRenameNote}
+        onEditContent={handleEditNoteContent}
+        onChangeColor={handleNoteChangeColor}
+      />
+
+      <CanvasContextMenu
+        visible={canvasContextMenu.visible}
+        x={canvasContextMenu.x}
+        y={canvasContextMenu.y}
+        onClose={handleCanvasContextMenuClose}
+        onAddTable={handleCanvasAddTable}
+        onAddArea={handleCanvasAddArea}
+        onAddNote={handleCanvasAddNote}
+        onUndo={handleCanvasUndo}
+        onRedo={handleCanvasRedo}
+        onStartAreaSelection={handleCanvasStartAreaSelection}
+        undoStack={undoStack}
+        redoStack={redoStack}
+      />
+
+      <FieldContextMenu
+        visible={fieldContextMenu.visible}
+        x={fieldContextMenu.x}
+        y={fieldContextMenu.y}
+        field={
+          fieldContextMenu.tableId !== null && fieldContextMenu.fieldId !== null
+            ? tables
+                .find((t) => t.id === fieldContextMenu.tableId)
+                ?.fields.find((f) => f.id === fieldContextMenu.fieldId)
+            : null
+        }
+        onClose={handleFieldContextMenuClose}
+        onEdit={handleEditField}
+        onRename={handleFieldRename}
+        onDelete={handleDeleteField}
+        onTogglePrimaryKey={handleToggleFieldPrimaryKey}
+        onToggleNotNull={handleToggleFieldNotNull}
+        onToggleUnique={handleToggleFieldUnique}
+        onToggleAutoIncrement={handleToggleFieldAutoIncrement}
+      />
+
+      <Modal
+        title={t("rename") + " Table"}
+        visible={renameModal.visible}
+        onOk={handleRenameConfirm}
+        onCancel={handleRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            ref={tableRenameInputRef}
+            value={renameModal.newName}
+            onChange={(value) =>
+              setRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            onEnterPress={handleRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Relationship"}
+        visible={relationshipRenameModal.visible}
+        onOk={handleRelationshipRenameConfirm}
+        onCancel={handleRelationshipRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            ref={relationshipRenameInputRef}
+            value={relationshipRenameModal.newName}
+            onChange={(value) =>
+              setRelationshipRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            onEnterPress={handleRelationshipRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Area"}
+        visible={areaRenameModal.visible}
+        onOk={handleAreaRenameConfirm}
+        onCancel={handleAreaRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            value={areaRenameModal.newName}
+            onChange={(value) =>
+              setAreaRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            autoFocus
+            onEnterPress={handleAreaRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Note"}
+        visible={noteRenameModal.visible}
+        onOk={handleNoteRenameConfirm}
+        onCancel={handleNoteRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("title")}:
+          </label>
+          <Input
+            value={noteRenameModal.newName}
+            onChange={(value) =>
+              setNoteRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("title")}
+            autoFocus
+            onEnterPress={handleNoteRenameConfirm}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("rename") + " Field"}
+        visible={fieldRenameModal.visible}
+        onOk={handleFieldRenameConfirm}
+        onCancel={handleFieldRenameCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+        maskClosable={false}
+        keyboard={false}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            {t("name")}:
+          </label>
+          <Input
+            ref={fieldRenameInputRef}
+            value={fieldRenameModal.newName}
+            onChange={(value) =>
+              setFieldRenameModal((prev) => ({
+                ...prev,
+                newName: value,
+              }))
+            }
+            placeholder={t("name")}
+            onEnterPress={(e) => {
+              e?.preventDefault();
+              e?.stopPropagation();
+              handleFieldRenameConfirm();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleFieldRenameConfirm();
+              }
+            }}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title="Foreign Key Relationship Detected"
+        visible={foreignKeyRenameModal.visible}
+        onOk={handleForeignKeyRenameYes}
+        onCancel={handleForeignKeyRenameCancel}
+        okText="Yes, rename both"
+        cancelText="Cancel"
+        width={600}
+        footer={foreignKeyRenameFooter}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <p style={{ marginBottom: "16px", lineHeight: "1.5" }}>
+            This field is part of a foreign key relationship with:
+          </p>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor:
+                settings.mode === "light" ? "#f5f5f5" : "#374151",
+              borderRadius: "4px",
+              marginBottom: "16px",
+            }}
+          >
+            <strong
+              style={{
+                color: settings.mode === "light" ? "#1f2937" : "#f9fafb",
+              }}
+            >
+              {foreignKeyRenameModal.relatedField?.tableName}.
+              {foreignKeyRenameModal.relatedField?.fieldName}
+            </strong>
+          </div>
+          <p style={{ lineHeight: "1.5" }}>
+            Would you like to rename the related field to{" "}
+            <strong>&ldquo;{foreignKeyRenameModal.newName}&rdquo;</strong> as
+            well to maintain consistency?
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }
