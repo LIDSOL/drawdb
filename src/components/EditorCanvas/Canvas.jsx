@@ -2214,6 +2214,7 @@ export default function Canvas() {
     // If pressing Alt + left click, start area selection
     if (e.altKey && e.button === 0) {
       setIsAreaSelecting(true);
+      setIsDrawingSelectionArea(true);
       setSelectionArea({
         startX: pointer.spaces.diagram.x,
         startY: pointer.spaces.diagram.y,
@@ -2225,8 +2226,13 @@ export default function Canvas() {
       return;
     }
 
-    // Cancel area selection if clicking without being in drawing mode
-    if (isAreaSelecting && !isDrawingSelectionArea && e.button === 0) {
+    // Cancel area selection if clicking without being in drawing mode (but not if Alt is pressed)
+    if (
+      isAreaSelecting &&
+      !isDrawingSelectionArea &&
+      e.button === 0 &&
+      !e.altKey
+    ) {
       setIsAreaSelecting(false);
       pointer.setStyle("default");
       return;
@@ -2854,6 +2860,8 @@ export default function Canvas() {
     if (e.key === "Alt") {
       // deactivate area selection
       setIsAreaSelecting(false);
+      setIsDrawingSelectionArea(false);
+      pointer.setStyle("default");
     }
   });
   const theme = localStorage.getItem("theme");
