@@ -8,11 +8,13 @@ import LandingPage from "./pages/LandingPage";
 import SettingsContextProvider from "./context/SettingsContext";
 import { useSettings } from "./hooks";
 import NotFound from "./pages/NotFound";
+import Analytics from "./components/Analytics";
 
 export default function App() {
   return (
     <SettingsContextProvider>
       <BrowserRouter>
+        <Analytics />
         <RestoreScroll />
         <Routes>
           <Route path="/" element={<LandingPage />} />
