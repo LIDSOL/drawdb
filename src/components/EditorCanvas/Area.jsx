@@ -203,7 +203,7 @@ function EditPopoverContent({ data }) {
   const [editField, setEditField] = useState({});
   const { setSaveState } = useSaveState();
   const { updateArea, deleteArea } = useAreas();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { t } = useTranslation();
 
   return (
@@ -216,11 +216,9 @@ function EditPopoverContent({ data }) {
           className="me-2"
           onChange={(value) => updateArea(data.id, { name: value })}
           onFocus={(e) => setEditField({ name: e.target.value })}
-          onBlur={(e) => {
-            if (e.target.value === editField.name) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
+            onBlur={(e) => {
+              if (e.target.value === editField.name) return;
+              pushUndo({
                 action: Action.EDIT,
                 element: ObjectType.AREA,
                 aid: data.id,
@@ -230,10 +228,8 @@ function EditPopoverContent({ data }) {
                   areaName: e.target.value,
                   extra: "[name]",
                 }),
-              },
-            ]);
-            setRedoStack([]);
-          }}
+              });
+            }}
         />
         <Popover
           content={
@@ -241,21 +237,17 @@ function EditPopoverContent({ data }) {
               <ColorPalette
                 currentColor={data.color}
                 onPickColor={(c) => {
-                  setUndoStack((prev) => [
-                    ...prev,
-                    {
-                      action: Action.EDIT,
-                      element: ObjectType.AREA,
-                      aid: data.id,
-                      undo: { color: data.color },
-                      redo: { color: c },
-                      message: t("edit_area", {
-                        areaName: data.name,
-                        extra: "[color]",
-                      }),
-                    },
-                  ]);
-                  setRedoStack([]);
+                  pushUndo({
+                    action: Action.EDIT,
+                    element: ObjectType.AREA,
+                    aid: data.id,
+                    undo: { color: data.color },
+                    redo: { color: c },
+                    message: t("edit_area", {
+                      areaName: data.name,
+                      extra: "[color]",
+                    }),
+                  });
                   updateArea(data.id, {
                     color: c,
                   });

@@ -18,7 +18,7 @@ import { databases } from "../../../data/databases";
 export default function FieldDetails({ data, tid, index }) {
   const { t } = useTranslation();
   const { tables, database } = useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { updateField, deleteField } = useDiagram();
   const [editField, setEditField] = useState({});
 
@@ -32,25 +32,21 @@ export default function FieldDetails({ data, tid, index }) {
         disabled={dbToTypes[database][data.type].noDefault || data.increment}
         onChange={(value) => updateField(tid, index, { default: value })}
         onFocus={(e) => setEditField({ default: e.target.value })}
-        onBlur={(e) => {
+            onBlur={(e) => {
           if (e.target.value === editField.default) return;
-          setUndoStack((prev) => [
-            ...prev,
-            {
-              action: Action.EDIT,
-              element: ObjectType.TABLE,
-              component: "field",
-              tid: tid,
-              fid: index,
-              undo: editField,
-              redo: { default: e.target.value },
-              message: t("edit_table", {
-                tableName: tables[tid].name,
-                extra: "[field]",
-              }),
-            },
-          ]);
-          setRedoStack([]);
+          pushUndo({
+            action: Action.EDIT,
+            element: ObjectType.TABLE,
+            component: "field",
+            tid: tid,
+            fid: index,
+            undo: editField,
+            redo: { default: e.target.value },
+            message: t("edit_table", {
+              tableName: tables[tid].name,
+              extra: "[field]",
+            }),
+          });
         }}
       />
       {(data.type === "ENUM" || data.type === "SET") && (
@@ -74,23 +70,19 @@ export default function FieldDetails({ data, tid, index }) {
                 JSON.stringify(editField.values) === JSON.stringify(data.values)
               )
                 return;
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "field",
-                  tid: tid,
-                  fid: index,
-                  undo: editField,
-                  redo: { values: data.values },
-                  message: t("edit_table", {
-                    tableName: tables[tid].name,
-                    extra: "[field]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TABLE,
+                component: "field",
+                tid: tid,
+                fid: index,
+                undo: editField,
+                redo: { values: data.values },
+                message: t("edit_table", {
+                  tableName: tables[tid].name,
+                  extra: "[field]",
+                }),
+              });
             }}
           />
         </>
@@ -106,23 +98,19 @@ export default function FieldDetails({ data, tid, index }) {
             onFocus={(e) => setEditField({ size: e.target.value })}
             onBlur={(e) => {
               if (e.target.value === editField.size) return;
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "field",
-                  tid: tid,
-                  fid: index,
-                  undo: editField,
-                  redo: { size: e.target.value },
-                  message: t("edit_table", {
-                    tableName: tables[tid].name,
-                    extra: "[field]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TABLE,
+                component: "field",
+                tid: tid,
+                fid: index,
+                undo: editField,
+                redo: { size: e.target.value },
+                message: t("edit_table", {
+                  tableName: tables[tid].name,
+                  extra: "[field]",
+                }),
+              });
             }}
           />
         </>
@@ -143,23 +131,19 @@ export default function FieldDetails({ data, tid, index }) {
             onFocus={(e) => setEditField({ size: e.target.value })}
             onBlur={(e) => {
               if (e.target.value === editField.size) return;
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "field",
-                  tid: tid,
-                  fid: index,
-                  undo: editField,
-                  redo: { size: e.target.value },
-                  message: t("edit_table", {
-                    tableName: tables[tid].name,
-                    extra: "[field]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TABLE,
+                component: "field",
+                tid: tid,
+                fid: index,
+                undo: editField,
+                redo: { size: e.target.value },
+                message: t("edit_table", {
+                  tableName: tables[tid].name,
+                  extra: "[field]",
+                }),
+              });
             }}
           />
         </>
@@ -176,23 +160,19 @@ export default function FieldDetails({ data, tid, index }) {
             onFocus={(e) => setEditField({ check: e.target.value })}
             onBlur={(e) => {
               if (e.target.value === editField.check) return;
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "field",
-                  tid: tid,
-                  fid: index,
-                  undo: editField,
-                  redo: { check: e.target.value },
-                  message: t("edit_table", {
-                    tableName: tables[tid].name,
-                    extra: "[field]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TABLE,
+                component: "field",
+                tid: tid,
+                fid: index,
+                undo: editField,
+                redo: { check: e.target.value },
+                message: t("edit_table", {
+                  tableName: tables[tid].name,
+                  extra: "[field]",
+                }),
+              });
             }}
           />
           <div className="text-xs mt-1">{t("this_will_appear_as_is")}</div>
@@ -203,30 +183,25 @@ export default function FieldDetails({ data, tid, index }) {
         <Checkbox
           value="unique"
           checked={data.unique}
-          onChange={(checkedValues) => {
+            onChange={(checkedValues) => {
             // If trying to remove unique from a primary key, show warning and don't change
             if (data.primary && data.unique && !checkedValues.target.checked) {
               Toast.info(t("pk_has_to_be_unique"));
               return;
             }
-
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: {
-                  [checkedValues.target.value]: !checkedValues.target.checked,
-                },
-                redo: {
-                  [checkedValues.target.value]: checkedValues.target.checked,
-                },
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              undo: {
+                [checkedValues.target.value]: !checkedValues.target.checked,
               },
-            ]);
-            setRedoStack([]);
+              redo: {
+                [checkedValues.target.value]: checkedValues.target.checked,
+              },
+            });
             updateField(tid, index, {
               [checkedValues.target.value]: checkedValues.target.checked,
             });
@@ -241,10 +216,39 @@ export default function FieldDetails({ data, tid, index }) {
           disabled={
             !dbToTypes[database][data.type].canIncrement || data.isArray
           }
-          onChange={(checkedValues) => {
-            setUndoStack((prev) => [
-              ...prev,
-              {
+            onChange={(checkedValues) => {
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              undo: {
+                [checkedValues.target.value]: !checkedValues.target.checked,
+              },
+              redo: {
+                [checkedValues.target.value]: checkedValues.target.checked,
+              },
+              message: t("edit_table", {
+                tableName: tables[tid].name,
+                extra: "[field]",
+              }),
+            });
+            updateField(tid, index, {
+              increment: !data.increment,
+              check: data.increment ? data.check : "",
+            });
+          }}
+        />
+      </div>
+      {databases[database].hasArrays && (
+        <div className="flex justify-between items-center my-3">
+          <div className="font-medium">{t("declare_array")}</div>
+          <Checkbox
+            value="isArray"
+            checked={data.isArray}
+            onChange={(checkedValues) => {
+              pushUndo({
                 action: Action.EDIT,
                 element: ObjectType.TABLE,
                 component: "field",
@@ -260,44 +264,7 @@ export default function FieldDetails({ data, tid, index }) {
                   tableName: tables[tid].name,
                   extra: "[field]",
                 }),
-              },
-            ]);
-            setRedoStack([]);
-            updateField(tid, index, {
-              increment: !data.increment,
-              check: data.increment ? data.check : "",
-            });
-          }}
-        />
-      </div>
-      {databases[database].hasArrays && (
-        <div className="flex justify-between items-center my-3">
-          <div className="font-medium">{t("declare_array")}</div>
-          <Checkbox
-            value="isArray"
-            checked={data.isArray}
-            onChange={(checkedValues) => {
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "field",
-                  tid: tid,
-                  fid: index,
-                  undo: {
-                    [checkedValues.target.value]: !checkedValues.target.checked,
-                  },
-                  redo: {
-                    [checkedValues.target.value]: checkedValues.target.checked,
-                  },
-                  message: t("edit_table", {
-                    tableName: tables[tid].name,
-                    extra: "[field]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              });
               updateField(tid, index, {
                 isArray: checkedValues.target.checked,
                 increment: data.isArray ? data.increment : false,
@@ -310,33 +277,28 @@ export default function FieldDetails({ data, tid, index }) {
         dbToTypes[database][data.type].signed && (
           <div className="flex justify-between items-center my-3">
             <div className="font-medium">{t("Unsigned")}</div>
-            <Checkbox
+              <Checkbox
               value="unsigned"
               checked={data.unsigned}
               onChange={(checkedValues) => {
-                setUndoStack((prev) => [
-                  ...prev,
-                  {
-                    action: Action.EDIT,
-                    element: ObjectType.TABLE,
-                    component: "field",
-                    tid: tid,
-                    fid: index,
-                    undo: {
-                      [checkedValues.target.value]:
-                        !checkedValues.target.checked,
-                    },
-                    redo: {
-                      [checkedValues.target.value]:
-                        checkedValues.target.checked,
-                    },
-                    message: t("edit_table", {
-                      tableName: tables[tid].name,
-                      extra: "[field]",
-                    }),
+                pushUndo({
+                  action: Action.EDIT,
+                  element: ObjectType.TABLE,
+                  component: "field",
+                  tid: tid,
+                  fid: index,
+                  undo: {
+                    [checkedValues.target.value]:
+                      !checkedValues.target.checked,
                   },
-                ]);
-                setRedoStack([]);
+                  redo: {
+                    [checkedValues.target.value]: checkedValues.target.checked,
+                  },
+                  message: t("edit_table", {
+                    tableName: tables[tid].name,
+                    extra: "[field]",
+                  }),
+                });
                 updateField(tid, index, {
                   unsigned: checkedValues.target.checked,
                 });
@@ -351,27 +313,23 @@ export default function FieldDetails({ data, tid, index }) {
         value={data.comment}
         autosize
         rows={2}
-        onChange={(value) => updateField(tid, index, { comment: value })}
+                onChange={(value) => updateField(tid, index, { comment: value })}
         onFocus={(e) => setEditField({ comment: e.target.value })}
         onBlur={(e) => {
           if (e.target.value === editField.comment) return;
-          setUndoStack((prev) => [
-            ...prev,
-            {
-              action: Action.EDIT,
-              element: ObjectType.TABLE,
-              component: "field",
-              tid: tid,
-              fid: index,
-              undo: editField,
-              redo: { comment: e.target.value },
-              message: t("edit_table", {
-                tableName: tables[tid].name,
-                extra: "[field]",
-              }),
-            },
-          ]);
-          setRedoStack([]);
+          pushUndo({
+            action: Action.EDIT,
+            element: ObjectType.TABLE,
+            component: "field",
+            tid: tid,
+            fid: index,
+            undo: editField,
+            redo: { comment: e.target.value },
+            message: t("edit_table", {
+              tableName: tables[tid].name,
+              extra: "[field]",
+            }),
+          });
         }}
       />
       <Button

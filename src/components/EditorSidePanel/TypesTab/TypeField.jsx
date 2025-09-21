@@ -19,7 +19,7 @@ export default function TypeField({ data, tid, fid }) {
   const { types, updateType } = useTypes();
   const { enums } = useEnums();
   const { database } = useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
   const { t } = useTranslation();
 
@@ -40,23 +40,19 @@ export default function TypeField({ data, tid, fid }) {
           onFocus={(e) => setEditField({ name: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TYPE,
-                component: "field",
-                tid: tid,
-                fid: fid,
-                undo: editField,
-                redo: { name: e.target.value },
-                message: t("edit_type", {
-                  typeName: data.name,
-                  extra: "[field]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TYPE,
+              component: "field",
+              tid: tid,
+              fid: fid,
+              undo: editField,
+              redo: { name: e.target.value },
+              message: t("edit_type", {
+                typeName: data.name,
+                extra: "[field]",
+              }),
+            });
           }}
         />
       </Col>
@@ -87,23 +83,19 @@ export default function TypeField({ data, tid, fid }) {
           placeholder={t("type")}
           onChange={(value) => {
             if (value === data.type) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TYPE,
-                component: "field",
-                tid: tid,
-                fid: fid,
-                undo: { type: data?.type },
-                redo: { type: value },
-                message: t("edit_type", {
-                  typeName: data.name,
-                  extra: "[field]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TYPE,
+              component: "field",
+              tid: tid,
+              fid: fid,
+              undo: { type: data?.type },
+              redo: { type: value },
+              message: t("edit_type", {
+                typeName: data.name,
+                extra: "[field]",
+              }),
+            });
             if (value === "ENUM" || value === "SET") {
               updateType(tid, {
                 fields: types[tid].fields?.map((e, id) =>
@@ -174,23 +166,19 @@ export default function TypeField({ data, tid, fid }) {
                         JSON.stringify(data.values)
                       )
                         return;
-                      setUndoStack((prev) => [
-                        ...prev,
-                        {
-                          action: Action.EDIT,
-                          element: ObjectType.TYPE,
-                          component: "field",
-                          tid: tid,
-                          fid: fid,
-                          undo: editField,
-                          redo: { values: data.values },
-                          message: t("edit_type", {
-                            typeName: data.name,
-                            extra: "[field]",
-                          }),
-                        },
-                      ]);
-                      setRedoStack([]);
+                      pushUndo({
+                        action: Action.EDIT,
+                        element: ObjectType.TYPE,
+                        component: "field",
+                        tid: tid,
+                        fid: fid,
+                        undo: editField,
+                        redo: { values: data.values },
+                        message: t("edit_type", {
+                          typeName: data.name,
+                          extra: "[field]",
+                        }),
+                      });
                     }}
                   />
                 </>
@@ -212,23 +200,19 @@ export default function TypeField({ data, tid, fid }) {
                     onFocus={(e) => setEditField({ size: e.target.value })}
                     onBlur={(e) => {
                       if (e.target.value === editField.size) return;
-                      setUndoStack((prev) => [
-                        ...prev,
-                        {
-                          action: Action.EDIT,
-                          element: ObjectType.TABLE,
-                          component: "field",
-                          tid: tid,
-                          fid: fid,
-                          undo: editField,
-                          redo: { size: e.target.value },
-                          message: t("edit_type", {
-                            typeName: data.name,
-                            extra: "[field]",
-                          }),
-                        },
-                      ]);
-                      setRedoStack([]);
+                      pushUndo({
+                        action: Action.EDIT,
+                        element: ObjectType.TABLE,
+                        component: "field",
+                        tid: tid,
+                        fid: fid,
+                        undo: editField,
+                        redo: { size: e.target.value },
+                        message: t("edit_type", {
+                          typeName: data.name,
+                          extra: "[field]",
+                        }),
+                      });
                     }}
                   />
                 </>
@@ -255,23 +239,19 @@ export default function TypeField({ data, tid, fid }) {
                     onFocus={(e) => setEditField({ size: e.target.value })}
                     onBlur={(e) => {
                       if (e.target.value === editField.size) return;
-                      setUndoStack((prev) => [
-                        ...prev,
-                        {
-                          action: Action.EDIT,
-                          element: ObjectType.TABLE,
-                          component: "field",
-                          tid: tid,
-                          fid: fid,
-                          undo: editField,
-                          redo: { size: e.target.value },
-                          message: t("edit_type", {
-                            typeName: data.name,
-                            extra: "[field]",
-                          }),
-                        },
-                      ]);
-                      setRedoStack([]);
+                      pushUndo({
+                        action: Action.EDIT,
+                        element: ObjectType.TABLE,
+                        component: "field",
+                        tid: tid,
+                        fid: fid,
+                        undo: editField,
+                        redo: { size: e.target.value },
+                        message: t("edit_type", {
+                          typeName: data.name,
+                          extra: "[field]",
+                        }),
+                      });
                     }}
                   />
                 </>
@@ -281,21 +261,18 @@ export default function TypeField({ data, tid, fid }) {
                 block
                 type="danger"
                 onClick={() => {
-                  setUndoStack((prev) => [
-                    ...prev,
-                    {
-                      action: Action.EDIT,
-                      element: ObjectType.TYPE,
-                      component: "field_delete",
-                      tid: tid,
-                      fid: fid,
-                      data: data,
-                      message: t("edit_type", {
-                        typeName: data.name,
-                        extra: "[delete field]",
-                      }),
-                    },
-                  ]);
+                  pushUndo({
+                    action: Action.EDIT,
+                    element: ObjectType.TYPE,
+                    component: "field_delete",
+                    tid: tid,
+                    fid: fid,
+                    data: data,
+                    message: t("edit_type", {
+                      typeName: data.name,
+                      extra: "[delete field]",
+                    }),
+                  });
                   updateType(tid, {
                     fields: types[tid].fields.filter((_, k) => k !== fid),
                   });

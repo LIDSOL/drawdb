@@ -15,7 +15,7 @@ export default function AreaInfo({ data, i }) {
   const { t } = useTranslation();
   const { setSaveState } = useSaveState();
   const { deleteArea, updateArea } = useAreas();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
 
   return (
@@ -35,21 +35,17 @@ export default function AreaInfo({ data, i }) {
           onFocus={(e) => setEditField({ name: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.AREA,
-                aid: i,
-                undo: editField,
-                redo: { name: e.target.value },
-                message: t("edit_area", {
-                  areaName: e.target.value,
-                  extra: "[name]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.AREA,
+              aid: i,
+              undo: editField,
+              redo: { name: e.target.value },
+              message: t("edit_area", {
+                areaName: e.target.value,
+                extra: "[name]",
+              }),
+            });
           }}
         />
       </Col>
@@ -64,21 +60,17 @@ export default function AreaInfo({ data, i }) {
                   setSaveState(State.SAVING);
                 }}
                 onPickColor={(c) => {
-                  setUndoStack((prev) => [
-                    ...prev,
-                    {
-                      action: Action.EDIT,
-                      element: ObjectType.AREA,
-                      aid: i,
-                      undo: { color: data.color },
-                      redo: { color: c },
-                      message: t("edit_area", {
-                        areaName: data.name,
-                        extra: "[color]",
-                      }),
-                    },
-                  ]);
-                  setRedoStack([]);
+                  pushUndo({
+                    action: Action.EDIT,
+                    element: ObjectType.AREA,
+                    aid: i,
+                    undo: { color: data.color },
+                    redo: { color: c },
+                    message: t("edit_area", {
+                      areaName: data.name,
+                      extra: "[color]",
+                    }),
+                  });
                   updateArea(i, { color: c });
                 }}
               />

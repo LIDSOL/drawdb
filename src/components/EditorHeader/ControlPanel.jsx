@@ -118,6 +118,10 @@ export default function ControlPanel({
   const { types, addType, deleteType, updateType, setTypes } = useTypes();
   const { notes, setNotes, updateNote, addNote, deleteNote } = useNotes();
   const { areas, setAreas, updateArea, addArea, deleteArea } = useAreas();
+  // IMPORTANT: ControlPanel orchestrates undo/redo commands and constructs
+  // complex undo actions. Do NOT replace internal `setUndoStack`/`setRedoStack`
+  // uses with `pushUndo` in this file — they intentionally manipulate the
+  // stacks (pop, filter, re-add) and changing them will break undo/redo logic.
   const { undoStack, redoStack, setUndoStack, setRedoStack } = useUndoRedo();
   const { selectedElement, setSelectedElement } = useSelect();
   const { transform, setTransform } = useTransform();
@@ -468,13 +472,6 @@ export default function ControlPanel({
         actionForRedoStack = { ...actionForRedoStack, ...redoStateProperties };
       }
       setRedoStack((prev) => [...prev, actionForRedoStack]);
-    } else if (a.action === Action.PAN) {
-      actionForRedoStack = { ...a, redo: { ...transform.pan } };
-      setTransform((prevTransform) => ({
-        ...prevTransform,
-        pan: a.undo,
-      }));
-      setRedoStack((prev) => [...prev, actionForRedoStack]);
     }
   };
 
@@ -725,13 +722,6 @@ export default function ControlPanel({
       if (Object.keys(undoStateProperties).length > 0 && !componentHandledDataDirectly) {
         actionForUndoStack = { ...actionForUndoStack, ...undoStateProperties };
       }
-      setUndoStack((prev) => [...prev, actionForUndoStack]);
-    } else if (a.action === Action.PAN) {
-      actionForUndoStack = { ...a, undo: { ...transform.pan } };
-      setTransform((prevTransform) => ({
-        ...prevTransform,
-        pan: a.redo,
-      }));
       setUndoStack((prev) => [...prev, actionForUndoStack]);
     }
   };

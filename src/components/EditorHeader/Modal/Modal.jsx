@@ -59,6 +59,9 @@ export default function Modal({
   const { setEnums } = useEnums();
   const { setTasks } = useTasks();
   const { setTransform } = useTransform();
+  // NOTE: Modal loads diagrams/templates and intentionally resets history
+  // using `setUndoStack([])` / `setRedoStack([])`. This is a deliberate reset
+  // of the history state — do not replace these resets with `pushUndo`.
   const { setUndoStack, setRedoStack } = useUndoRedo();
   const [uncontrolledTitle, setUncontrolledTitle] = useState(title);
   const [importSource, setImportSource] = useState({

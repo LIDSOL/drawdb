@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 export default function NoteInfo({ data, nid }) {
   const { updateNote, deleteNote } = useNotes();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
   const { t } = useTranslation();
 
@@ -30,21 +30,17 @@ export default function NoteInfo({ data, nid }) {
           onFocus={(e) => setEditField({ title: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.title) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.NOTE,
-                nid: data.id,
-                undo: editField,
-                redo: { title: e.target.value },
-                message: t("edit_note", {
-                  noteTitle: e.target.value,
-                  extra: "[title]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.NOTE,
+              nid: data.id,
+              undo: editField,
+              redo: { title: e.target.value },
+              message: t("edit_note", {
+                noteTitle: e.target.value,
+                extra: "[title]",
+              }),
+            });
           }}
         />
       </div>
@@ -63,27 +59,23 @@ export default function NoteInfo({ data, nid }) {
           onFocus={(e) =>
             setEditField({ content: e.target.value, height: data.height })
           }
-          onBlur={(e) => {
+            onBlur={(e) => {
             if (e.target.value === editField.content) return;
             const textarea = document.getElementById(`note_${data.id}`);
             textarea.style.height = "0";
             textarea.style.height = textarea.scrollHeight + "px";
             const newHeight = textarea.scrollHeight + 16 + 20 + 4;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.NOTE,
-                nid: nid,
-                undo: editField,
-                redo: { content: e.target.value, height: newHeight },
-                message: t("edit_note", {
-                  noteTitle: e.target.value,
-                  extra: "[content]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.NOTE,
+              nid: nid,
+              undo: editField,
+              redo: { content: e.target.value, height: newHeight },
+              message: t("edit_note", {
+                noteTitle: e.target.value,
+                extra: "[content]",
+              }),
+            });
           }}
           rows={3}
         />
@@ -100,21 +92,17 @@ export default function NoteInfo({ data, nid }) {
                       style={{ backgroundColor: c }}
                       className="w-10 h-10 p-3 rounded-full mx-1"
                       onClick={() => {
-                        setUndoStack((prev) => [
-                          ...prev,
-                          {
-                            action: Action.EDIT,
-                            element: ObjectType.NOTE,
-                            nid: nid,
-                            undo: { color: data.color },
-                            redo: { color: c },
-                            message: t("edit_note", {
-                              noteTitle: data.title,
-                              extra: "[color]",
-                            }),
-                          },
-                        ]);
-                        setRedoStack([]);
+                        pushUndo({
+                          action: Action.EDIT,
+                          element: ObjectType.NOTE,
+                          nid: nid,
+                          undo: { color: data.color },
+                          redo: { color: c },
+                          message: t("edit_note", {
+                            noteTitle: data.title,
+                            extra: "[color]",
+                          }),
+                        });
                         updateNote(nid, { color: c });
                       }}
                     >

@@ -9,7 +9,7 @@ export default function EnumDetails({ data, i }) {
   const { t } = useTranslation();
   const { deleteEnum, updateEnum } = useEnums();
   const { tables, updateField } = useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
 
   return (
@@ -43,22 +43,18 @@ export default function EnumDetails({ data, i }) {
               return acc;
             }, []);
 
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.ENUM,
-                id: i,
-                undo: editField,
-                redo: { name: e.target.value },
-                updatedFields,
-                message: t("edit_enum", {
-                  enumName: e.target.value,
-                  extra: "[name]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.ENUM,
+              id: i,
+              undo: editField,
+              redo: { name: e.target.value },
+              updatedFields,
+              message: t("edit_enum", {
+                enumName: e.target.value,
+                extra: "[name]",
+              }),
+            });
           }}
         />
       </div>
@@ -74,21 +70,17 @@ export default function EnumDetails({ data, i }) {
         onBlur={() => {
           if (JSON.stringify(editField.values) === JSON.stringify(data.values))
             return;
-          setUndoStack((prev) => [
-            ...prev,
-            {
-              action: Action.EDIT,
-              element: ObjectType.ENUM,
-              id: i,
-              undo: editField,
-              redo: { values: data.values },
-              message: t("edit_enum", {
-                enumName: data.name,
-                extra: "[values]",
-              }),
-            },
-          ]);
-          setRedoStack([]);
+          pushUndo({
+            action: Action.EDIT,
+            element: ObjectType.ENUM,
+            id: i,
+            undo: editField,
+            redo: { values: data.values },
+            message: t("edit_enum", {
+              enumName: data.name,
+              extra: "[values]",
+            }),
+          });
         }}
       />
       <Button

@@ -6,25 +6,20 @@ export function createNewField({
   database,
   dbToTypes,
   addFieldToTable,
-  setUndoStack,
-  setRedoStack,
+  pushUndo,
   t,
   tid,
 }) {
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.TABLE,
-        component: "field_add",
-        tid: tid,
-        message: t("edit_table", {
-          tableName: data.name,
-          extra: "[add field]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.TABLE,
+      component: "field_add",
+      tid: tid,
+      message: t("edit_table", {
+        tableName: data.name,
+        extra: "[add field]",
+      }),
+    });
 
     const incr = data.increment && !!dbToTypes[database][settings.defaultFieldType].canIncrement;
     // Function to get the default size configured by the user

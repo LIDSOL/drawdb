@@ -15,7 +15,7 @@ export default function TableField({ data, tid, index }) {
   const { enums } = useEnums();
   const { tables, database, addFieldToTable } = useDiagram();
   const { t } = useTranslation();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
   const { settings } = useSettings()
 
@@ -60,17 +60,16 @@ export default function TableField({ data, tid, index }) {
                 const input = document.getElementById(`scroll_table_${tid}_input_${index+1}`);
                 if (input) input.focus();
                 else {
-                    createNewField({
-                        data,
-                        settings,
-                        database,
-                        dbToTypes,
-                        addFieldToTable,
-                        setUndoStack,
-                        setRedoStack,
-                        t,
-                        tid,
-                    });
+          createNewField({
+            data,
+            settings,
+            database,
+            dbToTypes,
+            addFieldToTable,
+            pushUndo,
+            t,
+            tid,
+          });
                     setTimeout(() => {
                         const newInput = document.getElementById(`scroll_table_${tid}_input_${index+1}`);
                         if (newInput) newInput.focus();
@@ -82,25 +81,21 @@ export default function TableField({ data, tid, index }) {
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
             const transformedValue = settings.upperCaseFields
-            ? e.target.value.toUpperCase()
-            : e.target.value.toLowerCase();
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: editField,
-                redo: { name: transformedValue },
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+              ? e.target.value.toUpperCase()
+              : e.target.value.toLowerCase();
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              undo: editField,
+              redo: { name: transformedValue },
+              message: t("edit_table", {
+                tableName: tables[tid].name,
+                extra: "[field]",
+              }),
+            });
           }}
         />
       </Col>
@@ -125,11 +120,9 @@ export default function TableField({ data, tid, index }) {
           value={data.type}
           validateStatus={data.type === "" ? "error" : "default"}
           placeholder="Type"
-          onChange={(value) => {
-            if (value === data.type) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
+            onChange={(value) => {
+              if (value === data.type) return;
+              pushUndo({
                 action: Action.EDIT,
                 element: ObjectType.TABLE,
                 component: "field",
@@ -141,9 +134,7 @@ export default function TableField({ data, tid, index }) {
                   tableName: tables[tid].name,
                   extra: "[field]",
                 }),
-              },
-            ]);
-            setRedoStack([]);
+              });
             const incr =
               data.increment && !!dbToTypes[database][value].canIncrement;
 
@@ -193,14 +184,12 @@ export default function TableField({ data, tid, index }) {
           type={data.notNull || data.primary ? "primary" : "tertiary"}
           title={t("not_null")}
           theme={data.notNull ? "solid" : "light"}
-          onClick={() => {
-            if(data.primary){
-              Toast.info(t("pk_has_not_be_null"))
-              return;
-            }
-            setUndoStack((prev) => [
-              ...prev,
-              {
+            onClick={() => {
+              if (data.primary) {
+                Toast.info(t("pk_has_not_be_null"));
+                return;
+              }
+              pushUndo({
                 action: Action.EDIT,
                 element: ObjectType.TABLE,
                 component: "field",
@@ -212,11 +201,9 @@ export default function TableField({ data, tid, index }) {
                   tableName: tables[tid].name,
                   extra: "[field]",
                 }),
-              },
-            ]);
-            setRedoStack([]);
-            updateField(tid, index, { notNull: !data.notNull });
-          }}
+              });
+              updateField(tid, index, { notNull: !data.notNull });
+            }}
         >
           ?
         </Button>
@@ -249,21 +236,17 @@ export default function TableField({ data, tid, index }) {
               redo.notNull = true;
               changes.notNull = true;
             }
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              message: t("edit_table", {
+                tableName: tables[tid].name,
+                extra: "[field]",
+              }),
+            });
             updateField(tid, index, { primary: newStatePK, notNull: stateNull });
           }}
           icon={<IconKeyStroked />}

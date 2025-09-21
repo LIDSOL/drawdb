@@ -9,7 +9,7 @@ export const EnumsContext = createContext(null);
 export default function EnumsContextProvider({ children }) {
   const { t } = useTranslation();
   const [enums, setEnums] = useState([]);
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
 
   const addEnum = (data, addToHistory = true) => {
     if (data) {
@@ -28,34 +28,26 @@ export default function EnumsContextProvider({ children }) {
       ]);
     }
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.ADD,
-          element: ObjectType.ENUM,
-          message: t("add_enum"),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.ENUM,
+        message: t("add_enum"),
+      });
     }
   };
 
   const deleteEnum = (id, addToHistory = true) => {
     if (addToHistory) {
       Toast.success(t("enum_deleted"));
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.ENUM,
-          id: id,
-          data: enums[id],
-          message: t("delete_enum", {
-            enumName: enums[id].name,
-          }),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.ENUM,
+        id: id,
+        data: enums[id],
+        message: t("delete_enum", {
+          enumName: enums[id].name,
+        }),
+      });
     }
     setEnums((prev) => prev.filter((_, i) => i !== id));
   };

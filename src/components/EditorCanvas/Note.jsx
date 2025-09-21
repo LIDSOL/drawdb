@@ -31,7 +31,7 @@ export default function Note({ data, onPointerDown, onContextMenu }) {
   const { t } = useTranslation();
   const { setSaveState } = useSaveState();
   const { updateNote, deleteNote } = useNotes();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { selectedElement, setSelectedElement } = useSelect();
 
   const handleChange = (e) => {
@@ -48,21 +48,17 @@ export default function Note({ data, onPointerDown, onContextMenu }) {
     textarea.style.height = "0";
     textarea.style.height = textarea.scrollHeight + "px";
     const newHeight = textarea.scrollHeight + 16 + 20 + 4;
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.NOTE,
-        nid: data.id,
-        undo: editField,
-        redo: { content: e.target.value, height: newHeight },
-        message: t("edit_note", {
-          noteTitle: e.target.value,
-          extra: "[content]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.NOTE,
+      nid: data.id,
+      undo: editField,
+      redo: { content: e.target.value, height: newHeight },
+      message: t("edit_note", {
+        noteTitle: e.target.value,
+        extra: "[content]",
+      }),
+    });
   };
 
   const edit = () => {
@@ -195,21 +191,17 @@ export default function Note({ data, onPointerDown, onContextMenu }) {
                           }
                           onBlur={(e) => {
                             if (e.target.value === editField.title) return;
-                            setUndoStack((prev) => [
-                              ...prev,
-                              {
-                                action: Action.EDIT,
-                                element: ObjectType.NOTE,
-                                nid: data.id,
-                                undo: editField,
-                                redo: { title: e.target.value },
-                                message: t("edit_note", {
-                                  noteTitle: e.target.value,
-                                  extra: "[title]",
-                                }),
-                              },
-                            ]);
-                            setRedoStack([]);
+                            pushUndo({
+                              action: Action.EDIT,
+                              element: ObjectType.NOTE,
+                              nid: data.id,
+                              undo: editField,
+                              redo: { title: e.target.value },
+                              message: t("edit_note", {
+                                noteTitle: e.target.value,
+                                extra: "[title]",
+                              }),
+                            });
                           }}
                         />
                         <Popover
@@ -226,21 +218,17 @@ export default function Note({ data, onPointerDown, onContextMenu }) {
                                     style={{ backgroundColor: c }}
                                     className="p-3 rounded-full mx-1"
                                     onClick={() => {
-                                      setUndoStack((prev) => [
-                                        ...prev,
-                                        {
-                                          action: Action.EDIT,
-                                          element: ObjectType.NOTE,
-                                          nid: data.id,
-                                          undo: { color: data.color },
-                                          redo: { color: c },
-                                          message: t("edit_note", {
-                                            noteTitle: data.title,
-                                            extra: "[color]",
-                                          }),
-                                        },
-                                      ]);
-                                      setRedoStack([]);
+                                      pushUndo({
+                                        action: Action.EDIT,
+                                        element: ObjectType.NOTE,
+                                        nid: data.id,
+                                        undo: { color: data.color },
+                                        redo: { color: c },
+                                        message: t("edit_note", {
+                                          noteTitle: data.title,
+                                          extra: "[color]",
+                                        }),
+                                      });
                                       updateNote(data.id, { color: c });
                                     }}
                                   >

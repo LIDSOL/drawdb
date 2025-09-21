@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 export default function TypeInfo({ index, data }) {
   const { deleteType, updateType } = useTypes();
   const { tables, updateField } = useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
   const { t } = useTranslation();
 
@@ -61,23 +61,19 @@ export default function TypeInfo({ index, data }) {
                 return acc;
               }, []);
 
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TYPE,
-                  component: "self",
-                  tid: index,
-                  undo: editField,
-                  redo: { name: e.target.value },
-                  updatedFields,
-                  message: t("edit_type", {
-                    typeName: data.name,
-                    extra: "[name]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TYPE,
+                component: "self",
+                tid: index,
+                undo: editField,
+                redo: { name: e.target.value },
+                updatedFields,
+                message: t("edit_type", {
+                  typeName: data.name,
+                  extra: "[name]",
+                }),
+              });
             }}
           />
         </div>
@@ -103,22 +99,18 @@ export default function TypeInfo({ index, data }) {
                 onFocus={(e) => setEditField({ comment: e.target.value })}
                 onBlur={(e) => {
                   if (e.target.value === editField.comment) return;
-                  setUndoStack((prev) => [
-                    ...prev,
-                    {
-                      action: Action.EDIT,
-                      element: ObjectType.TYPE,
-                      component: "self",
-                      tid: index,
-                      undo: editField,
-                      redo: { comment: e.target.value },
-                      message: t("edit_type", {
-                        typeName: data.name,
-                        extra: "[comment]",
-                      }),
-                    },
-                  ]);
-                  setRedoStack([]);
+                  pushUndo({
+                    action: Action.EDIT,
+                    element: ObjectType.TYPE,
+                    component: "self",
+                    tid: index,
+                    undo: editField,
+                    redo: { comment: e.target.value },
+                    message: t("edit_type", {
+                      typeName: data.name,
+                      extra: "[comment]",
+                    }),
+                  });
                 }}
               />
             </Collapse.Panel>
@@ -129,20 +121,16 @@ export default function TypeInfo({ index, data }) {
             <Button
               icon={<IconPlus />}
               onClick={() => {
-                setUndoStack((prev) => [
-                  ...prev,
-                  {
-                    action: Action.EDIT,
-                    element: ObjectType.TYPE,
-                    component: "field_add",
-                    tid: index,
-                    message: t("edit_type", {
-                      typeName: data.name,
-                      extra: "[add field]",
-                    }),
-                  },
-                ]);
-                setRedoStack([]);
+                pushUndo({
+                  action: Action.EDIT,
+                  element: ObjectType.TYPE,
+                  component: "field_add",
+                  tid: index,
+                  message: t("edit_type", {
+                    typeName: data.name,
+                    extra: "[add field]",
+                  }),
+                });
                 updateType(index, {
                   fields: [
                     ...data.fields,
