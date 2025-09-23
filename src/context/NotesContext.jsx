@@ -10,7 +10,7 @@ export default function NotesContextProvider({ children }) {
   const { t } = useTranslation();
   const [notes, setNotes] = useState([]);
   const { transform } = useTransform();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { selectedElement, setSelectedElement } = useSelect();
 
   const addNote = (data, addToHistory = true) => {
@@ -36,31 +36,23 @@ export default function NotesContextProvider({ children }) {
       ]);
     }
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.ADD,
-          element: ObjectType.NOTE,
-          message: t("add_note"),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.NOTE,
+        message: t("add_note"),
+      });
     }
   };
 
   const deleteNote = (id, addToHistory = true) => {
     if (addToHistory) {
       Toast.success(t("note_deleted"));
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.NOTE,
-          data: notes[id],
-          message: t("delete_note", { noteTitle: notes[id].title }),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.NOTE,
+        data: notes[id],
+        message: t("delete_note", { noteTitle: notes[id].title }),
+      });
     }
     setNotes((prev) =>
       prev.filter((e) => e.id !== id).map((e, i) => ({ ...e, id: i })),

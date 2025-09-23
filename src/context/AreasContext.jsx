@@ -11,7 +11,7 @@ export default function AreasContextProvider({ children }) {
   const [areas, setAreas] = useState([]);
   const { transform } = useTransform();
   const { selectedElement, setSelectedElement } = useSelect();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
 
   const addArea = (data, addToHistory = true) => {
     if (data) {
@@ -37,31 +37,23 @@ export default function AreasContextProvider({ children }) {
       ]);
     }
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.ADD,
-          element: ObjectType.AREA,
-          message: t("add_area"),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.AREA,
+        message: t("add_area"),
+      });
     }
   };
 
   const deleteArea = (id, addToHistory = true) => {
     if (addToHistory) {
       Toast.success(t("area_deleted"));
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.AREA,
-          data: areas[id],
-          message: t("delete_area", areas[id].name),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.AREA,
+        data: areas[id],
+        message: t("delete_area", areas[id].name),
+      });
     }
     setAreas((prev) =>
       prev.filter((e) => e.id !== id).map((e, i) => ({ ...e, id: i })),

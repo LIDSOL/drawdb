@@ -12,7 +12,7 @@ export default function DiagramContextProvider({ children }) {
   const [tables, setTables] = useState([]);
   const [relationships, setRelationships] = useState([]);
   const { transform } = useTransform();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { selectedElement, setSelectedElement } = useSelect();
   const { settings } = useSettings();
 
@@ -54,15 +54,11 @@ export default function DiagramContextProvider({ children }) {
       ]);
     }
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.ADD,
-          element: ObjectType.TABLE,
-          message: t("add_table"),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.TABLE,
+        message: t("add_table"),
+      });
     }
   };
 
@@ -75,16 +71,12 @@ export default function DiagramContextProvider({ children }) {
         }
         return acc;
       }, []);
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.TABLE,
-          data: { table: tables[id], relationship: rels },
-          message: t("delete_table", { tableName: tables[id].name }),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.TABLE,
+        data: { table: tables[id], relationship: rels },
+        message: t("delete_table", { tableName: tables[id].name }),
+      });
     }
     setRelationships((prevR) => {
       return prevR
@@ -253,25 +245,21 @@ export default function DiagramContextProvider({ children }) {
     );
 
     if (addToHistory && previousFieldsState) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.EDIT,
-          element: ObjectType.TABLE,
-          component: "field_update",
-          tid: tid,
-          data: {
-            previousFields: previousFieldsState,
-            updatedFieldId: fid,
-            appliedValues: updatedValues
-          },
-          message: t("edit_table_field",
-            { fieldName: originalFieldForMessage?.name ||
-              `field ${fid}`, tableName: tableBeforeUpdate?.name ||
-               `table ${tid}` }),
+      pushUndo({
+        action: Action.EDIT,
+        element: ObjectType.TABLE,
+        component: "field_update",
+        tid: tid,
+        data: {
+          previousFields: previousFieldsState,
+          updatedFieldId: fid,
+          appliedValues: updatedValues
         },
-      ]);
-      setRedoStack([]);
+        message: t("edit_table_field",
+          { fieldName: originalFieldForMessage?.name ||
+            `field ${fid}`, tableName: tableBeforeUpdate?.name ||
+             `table ${tid}` }),
+      });
     }
   };
 
@@ -475,28 +463,24 @@ export default function DiagramContextProvider({ children }) {
 
 
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.EDIT,
-          element: ObjectType.TABLE,
-          component: "field_delete",
-          tid: tid,
-          data: {
-            field: JSON.parse(JSON.stringify(field)),
-            deletedRelationships: JSON.parse(JSON.stringify(affectedRelationships)), // Relationships that will be deleted
-            modifiedRelationshipsOriginalState: relationshipsBeforeModification, // Original state of relationships that are only modified
-            modifiedSubtypeRelationship: modifiedSubtypeRelationship, // Original state of modified subtype relationship
-            previousFields: previousFields,
-            childFieldsSnapshot: JSON.parse(JSON.stringify(childFieldsSnapshot)),
-          },
-          message: t("edit_table", {
-            tableName: currentTable.name,
-            extra: "[delete field]",
-          }),
+      pushUndo({
+        action: Action.EDIT,
+        element: ObjectType.TABLE,
+        component: "field_delete",
+        tid: tid,
+        data: {
+          field: JSON.parse(JSON.stringify(field)),
+          deletedRelationships: JSON.parse(JSON.stringify(affectedRelationships)), // Relationships that will be deleted
+          modifiedRelationshipsOriginalState: relationshipsBeforeModification, // Original state of relationships that are only modified
+          modifiedSubtypeRelationship: modifiedSubtypeRelationship, // Original state of modified subtype relationship
+          previousFields: previousFields,
+          childFieldsSnapshot: JSON.parse(JSON.stringify(childFieldsSnapshot)),
         },
-      ]);
-      setRedoStack([]);
+        message: t("edit_table", {
+          tableName: currentTable.name,
+          extra: "[delete field]",
+        }),
+      });
     }
 
     // Delete relationships (affectedRelationships)
@@ -579,20 +563,16 @@ export default function DiagramContextProvider({ children }) {
       const newRelationshipWithId = { ...relationshipData, id: newRelationshipId };
 
       setRelationships((prev) => [...prev, newRelationshipWithId]);
-      setUndoStack((prevUndo) => [
-        ...prevUndo,
-        {
-          action: Action.ADD,
-          element: ObjectType.RELATIONSHIP,
-          data: {
-            relationship: JSON.parse(JSON.stringify(newRelationshipWithId)),
-            autoGeneratedFkFields: JSON.parse(JSON.stringify(autoGeneratedFkFields || [])),
-            childTableIdWithGeneratedFks: childTableIdForFks,
-          },
-          message: t("add_relationship"),
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.RELATIONSHIP,
+        data: {
+          relationship: JSON.parse(JSON.stringify(newRelationshipWithId)),
+          autoGeneratedFkFields: JSON.parse(JSON.stringify(autoGeneratedFkFields || [])),
+          childTableIdWithGeneratedFks: childTableIdForFks,
         },
-      ]);
-      setRedoStack([]);
+        message: t("add_relationship"),
+      });
     } else {
       setRelationships((prevRels) => {
         let tempRels = [...prevRels];
@@ -680,23 +660,19 @@ export default function DiagramContextProvider({ children }) {
     }
 
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.RELATIONSHIP,
-          data: {
-            relationship: JSON.parse(JSON.stringify(relationshipToDelete)),
-            childTableFieldsBeforeFkDeletion: childTableFieldsBeforeFkDeletion,
-            childTableIdWithPotentiallyModifiedFields: childTableIdWithModifiedFields || primaryChildTableId || relationshipToDelete.endTableIds?.[0],
-            allChildTablesFieldsBeforeFkDeletion: Object.keys(allChildTablesFieldsBeforeFkDeletion).length > 0 ? allChildTablesFieldsBeforeFkDeletion : null,
-          },
-          message: t("delete_relationship", {
-            refName: relationshipToDelete.name,
-          }),
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.RELATIONSHIP,
+        data: {
+          relationship: JSON.parse(JSON.stringify(relationshipToDelete)),
+          childTableFieldsBeforeFkDeletion: childTableFieldsBeforeFkDeletion,
+          childTableIdWithPotentiallyModifiedFields: childTableIdWithModifiedFields || primaryChildTableId || relationshipToDelete.endTableIds?.[0],
+          allChildTablesFieldsBeforeFkDeletion: Object.keys(allChildTablesFieldsBeforeFkDeletion).length > 0 ? allChildTablesFieldsBeforeFkDeletion : null,
         },
-      ]);
-      setRedoStack([]);
+        message: t("delete_relationship", {
+          refName: relationshipToDelete.name,
+        }),
+      });
     }
 
     setRelationships((prev) =>
@@ -821,33 +797,29 @@ export default function DiagramContextProvider({ children }) {
     const newEndTableIds = [...endTableIds, childTableId];
     const newEndFieldIds = [...endFieldIds, firstFieldId];
     // Register undo/redo action if requested
-    if (shouldAddToUndoStack && typeof setUndoStack === 'function') {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.EDIT,
-          element: ObjectType.RELATIONSHIP,
-          rid: relationshipId,
-          undo: {
-            endTableIds: relationshipToUpdate.endTableIds,
-            endFieldIds: relationshipToUpdate.endFieldIds,
-            endTableId: relationshipToUpdate.endTableId,
-            endFieldId: relationshipToUpdate.endFieldId,
-            generatedFkFields: newFkFields.length > 0 ? newFkFields : null, // Store generated FK fields for undo
-            childTableId: childTableId,
-          },
-          redo: {
-            endTableIds: newEndTableIds,
-            endFieldIds: newEndFieldIds,
-            endTableId: undefined,
-            endFieldId: undefined,
-            generatedFkFields: newFkFields.length > 0 ? newFkFields : null, // Store generated FK fields for redo
-            childTableId: childTableId,
-          },
-          message: `Add child table to subtype relationship with FK generation`,
+    if (shouldAddToUndoStack) {
+      pushUndo({
+        action: Action.EDIT,
+        element: ObjectType.RELATIONSHIP,
+        rid: relationshipId,
+        undo: {
+          endTableIds: relationshipToUpdate.endTableIds,
+          endFieldIds: relationshipToUpdate.endFieldIds,
+          endTableId: relationshipToUpdate.endTableId,
+          endFieldId: relationshipToUpdate.endFieldId,
+          generatedFkFields: newFkFields.length > 0 ? newFkFields : null, // Store generated FK fields for undo
+          childTableId: childTableId,
         },
-      ]);
-      setRedoStack([]);
+        redo: {
+          endTableIds: newEndTableIds,
+          endFieldIds: newEndFieldIds,
+          endTableId: undefined,
+          endFieldId: undefined,
+          generatedFkFields: newFkFields.length > 0 ? newFkFields : null, // Store generated FK fields for redo
+          childTableId: childTableId,
+        },
+        message: `Add child table to subtype relationship with FK generation`,
+      });
     }
     setRelationships(prev =>
       prev.map(rel => {
@@ -920,48 +892,41 @@ export default function DiagramContextProvider({ children }) {
         shouldDeleteRelationship = true;
       }
       // Register undo/redo action if requested
-      if (shouldAddToUndoStack && typeof setUndoStack === 'function') {
+      if (shouldAddToUndoStack) {
         if (shouldDeleteRelationship) {
           // When deleting the entire relationship, use DELETE action
-          setUndoStack((prev) => [
-            ...prev,
-            {
-              action: Action.DELETE,
-              element: ObjectType.RELATIONSHIP,
-              data: {
-                relationship: JSON.parse(JSON.stringify(relationshipToUpdate)),
-                removedFkFields: removedFkFields,
-                childTableId: childTableId,
-              },
-              message: `Delete subtype relationship (last child removed) with FK cleanup`,
+          pushUndo({
+            action: Action.DELETE,
+            element: ObjectType.RELATIONSHIP,
+            data: {
+              relationship: JSON.parse(JSON.stringify(relationshipToUpdate)),
+              removedFkFields: removedFkFields,
+              childTableId: childTableId,
             },
-          ]);
+            message: `Delete subtype relationship (last child removed) with FK cleanup`,
+          });
         } else {
           // When editing the relationship, use EDIT action
-          setUndoStack((prev) => [
-            ...prev,
-            {
-              action: Action.EDIT,
-              element: ObjectType.RELATIONSHIP,
-              rid: relationshipId,
-              undo: {
-                endTableIds: relationshipToUpdate.endTableIds,
-                endFieldIds: relationshipToUpdate.endFieldIds,
-                endTableId: relationshipToUpdate.endTableId,
-                endFieldId: relationshipToUpdate.endFieldId,
-                removedFkFields: removedFkFields, // Store removed FK fields for undo
-                childTableId: childTableId,
-              },
-              redo: {
-                ...newRelationshipState,
-                removedFkFields: removedFkFields, // Store removed FK fields for redo
-                childTableId: childTableId,
-              },
-              message: `Remove child table from subtype relationship with FK cleanup`,
+          pushUndo({
+            action: Action.EDIT,
+            element: ObjectType.RELATIONSHIP,
+            rid: relationshipId,
+            undo: {
+              endTableIds: relationshipToUpdate.endTableIds,
+              endFieldIds: relationshipToUpdate.endFieldIds,
+              endTableId: relationshipToUpdate.endTableId,
+              endFieldId: relationshipToUpdate.endFieldId,
+              removedFkFields: removedFkFields, // Store removed FK fields for undo
+              childTableId: childTableId,
             },
-          ]);
+            redo: {
+              ...newRelationshipState,
+              removedFkFields: removedFkFields, // Store removed FK fields for redo
+              childTableId: childTableId,
+            },
+            message: `Remove child table from subtype relationship with FK cleanup`,
+          });
         }
-        setRedoStack([]);
       }
       if (shouldDeleteRelationship) {
         // Delete the entire relationship

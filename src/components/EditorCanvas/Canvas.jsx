@@ -98,6 +98,12 @@ export default function Canvas() {
   const { notes, updateNote, addNote, deleteNote } = useNotes();
   const { layout } = useLayout();
   const { settings } = useSettings();
+  // IMPORTANT: this file implements the internal undo/redo machinery.
+  // Do NOT replace direct calls to `setUndoStack` or `setRedoStack` here with
+  // `pushUndo`. `setUndoStack` is intentionally used for low-level operations
+  // (popping, re-queuing, reconstructing complex actions) that must remain
+  // under explicit control. `pushUndo` is a higher-level helper for UI-side
+  // append+clear behavior and will not preserve the internal semantics.
   const { undoStack, redoStack, setRedoStack, setUndoStack, pushUndo } =
     useUndoRedo();
 
@@ -808,18 +814,14 @@ export default function Canvas() {
           }
         }
 
-        setUndoStack((prev) => [
-          ...prev,
-          {
-            action: Action.EDIT,
-            element: ObjectType.RELATIONSHIP,
-            rid: relationshipContextMenu.relationshipId,
-            undo: undoData,
-            redo: redoData,
-            message: `Swap direction for ${relationship.name}`,
-          },
-        ]);
-        setRedoStack([]);
+        pushUndo({
+          action: Action.EDIT,
+          element: ObjectType.RELATIONSHIP,
+          rid: relationshipContextMenu.relationshipId,
+          undo: undoData,
+          redo: redoData,
+          message: `Swap direction for ${relationship.name}`,
+        });
 
         setRelationships((prev) =>
           prev.map((e, idx) => {
@@ -867,28 +869,24 @@ export default function Canvas() {
           ? SubtypeRestriction.DISJOINT_TOTAL
           : undefined;
 
-        setUndoStack((prev) => [
-          ...prev,
-          {
-            action: Action.EDIT,
-            element: ObjectType.RELATIONSHIP,
-            rid: relationshipContextMenu.relationshipId,
-            undo: {
-              relationshipType: relationship.relationshipType,
-              cardinality: relationship.cardinality,
-              subtype: relationship.subtype,
-              subtype_restriction: relationship.subtype_restriction,
-            },
-            redo: {
-              relationshipType: newType,
-              cardinality: defaultCardinality,
-              subtype: isBecomingSubtype,
-              subtype_restriction: defaultSubtypeRestriction,
-            },
-            message: `Change type for ${relationship.name}`,
+        pushUndo({
+          action: Action.EDIT,
+          element: ObjectType.RELATIONSHIP,
+          rid: relationshipContextMenu.relationshipId,
+          undo: {
+            relationshipType: relationship.relationshipType,
+            cardinality: relationship.cardinality,
+            subtype: relationship.subtype,
+            subtype_restriction: relationship.subtype_restriction,
           },
-        ]);
-        setRedoStack([]);
+          redo: {
+            relationshipType: newType,
+            cardinality: defaultCardinality,
+            subtype: isBecomingSubtype,
+            subtype_restriction: defaultSubtypeRestriction,
+          },
+          message: `Change type for ${relationship.name}`,
+        });
 
         // When becoming subtype, convert existing FK fields to primary keys
         if (isBecomingSubtype && !wasSubtype) {
@@ -945,18 +943,14 @@ export default function Canvas() {
       const relationship =
         relationships[relationshipContextMenu.relationshipId];
       if (relationship) {
-        setUndoStack((prev) => [
-          ...prev,
-          {
-            action: Action.EDIT,
-            element: ObjectType.RELATIONSHIP,
-            rid: relationshipContextMenu.relationshipId,
-            undo: { cardinality: relationship.cardinality },
-            redo: { cardinality: newCardinality },
-            message: `Change cardinality for ${relationship.name}`,
-          },
-        ]);
-        setRedoStack([]);
+        pushUndo({
+          action: Action.EDIT,
+          element: ObjectType.RELATIONSHIP,
+          rid: relationshipContextMenu.relationshipId,
+          undo: { cardinality: relationship.cardinality },
+          redo: { cardinality: newCardinality },
+          message: `Change cardinality for ${relationship.name}`,
+        });
         setRelationships((prev) =>
           prev.map((e, idx) =>
             idx === relationshipContextMenu.relationshipId
@@ -1023,18 +1017,14 @@ export default function Canvas() {
           return; // Already has default name
         }
 
-        setUndoStack((prev) => [
-          ...prev,
-          {
-            action: Action.EDIT,
-            element: ObjectType.RELATIONSHIP,
-            rid: relationshipContextMenu.relationshipId,
-            undo: { name: relationship.name },
-            redo: { name: defaultName },
-            message: `Set default name for ${defaultName}`,
-          },
-        ]);
-        setRedoStack([]);
+        pushUndo({
+          action: Action.EDIT,
+          element: ObjectType.RELATIONSHIP,
+          rid: relationshipContextMenu.relationshipId,
+          undo: { name: relationship.name },
+          redo: { name: defaultName },
+          message: `Set default name for ${defaultName}`,
+        });
         updateRelationship(relationshipContextMenu.relationshipId, {
           name: defaultName,
         });
@@ -2540,16 +2530,6 @@ export default function Canvas() {
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     setResizing({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
     if (panning.isPanning && didPan()) {
-      pushUndo({
-        action: Action.PAN,
-        undo: { x: panning.x, y: panning.y },
-        redo: transform.pan,
-        message: t("move_element", {
-          coords: `(${transform?.pan.x}, ${transform?.pan.y})`,
-          name: "diagram",
-        }),
-      });
-      setRedoStack([]);
       setSelectedElement((prev) => ({
         ...prev,
         element: ObjectType.NONE,

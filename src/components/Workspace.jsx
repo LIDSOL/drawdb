@@ -55,6 +55,10 @@ export default function WorkSpace() {
     database,
     setDatabase,
   } = useDiagram();
+  // NOTE: Workspace is responsible for loading diagrams/templates/gists and
+  // intentionally resets undo/redo state with `setUndoStack([])` / `setRedoStack([])`
+  // when replacing the entire application state. These resets are intentional
+  // and should not be replaced with `pushUndo`.
   const { undoStack, redoStack, setUndoStack, setRedoStack } = useUndoRedo();
   const { t, i18n } = useTranslation();
   let [searchParams, setSearchParams] = useSearchParams();

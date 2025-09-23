@@ -25,7 +25,7 @@ export default function TableInfo({ data }) {
   const [indexActiveKey, setIndexActiveKey] = useState("");
   const { deleteTable, updateTable, addFieldToTable, updateField, setRelationships, database } =
     useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
   const { settings } = useSettings();
   const [drag, setDrag] = useState({
@@ -51,22 +51,18 @@ export default function TableInfo({ data }) {
             const transformedValue = settings.upperCaseFields
               ? e.target.value.toUpperCase()
               : e.target.value.toLowerCase();
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "self",
-                tid: data.id,
-                undo: editField,
-                redo: { name: transformedValue },
-                message: t("edit_table", {
-                  tableName: transformedValue,
-                  extra: "[name]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "self",
+              tid: data.id,
+              undo: editField,
+              redo: { name: transformedValue },
+              message: t("edit_table", {
+                tableName: transformedValue,
+                extra: "[name]",
+              }),
+            });
           }}
         />
       </div>
@@ -211,22 +207,18 @@ export default function TableInfo({ data }) {
               onFocus={(e) => setEditField({ comment: e.target.value })}
               onBlur={(e) => {
                 if (e.target.value === editField.comment) return;
-                setUndoStack((prev) => [
-                  ...prev,
-                  {
-                    action: Action.EDIT,
-                    element: ObjectType.TABLE,
-                    component: "self",
-                    tid: data.id,
-                    undo: editField,
-                    redo: { comment: e.target.value },
-                    message: t("edit_table", {
-                      tableName: e.target.value,
-                      extra: "[comment]",
-                    }),
-                  },
-                ]);
-                setRedoStack([]);
+                pushUndo({
+                  action: Action.EDIT,
+                  element: ObjectType.TABLE,
+                  component: "self",
+                  tid: data.id,
+                  undo: editField,
+                  redo: { comment: e.target.value },
+                  message: t("edit_table", {
+                    tableName: e.target.value,
+                    extra: "[comment]",
+                  }),
+                });
               }}
             />
           </Collapse.Panel>
@@ -241,41 +233,33 @@ export default function TableInfo({ data }) {
                 <ColorPalette
                   currentColor={data.color}
                   onClearColor={() => {
-                    setUndoStack((prev) => [
-                      ...prev,
-                      {
-                        action: Action.EDIT,
-                        element: ObjectType.TABLE,
-                        component: "self",
-                        tid: data.id,
-                        undo: { color: data.color },
-                        redo: { color: defaultBlue },
-                        message: t("edit_table", {
-                          tableName: data.name,
-                          extra: "[color]",
-                        }),
-                      },
-                    ]);
-                    setRedoStack([]);
+                    pushUndo({
+                      action: Action.EDIT,
+                      element: ObjectType.TABLE,
+                      component: "self",
+                      tid: data.id,
+                      undo: { color: data.color },
+                      redo: { color: defaultBlue },
+                      message: t("edit_table", {
+                        tableName: data.name,
+                        extra: "[color]",
+                      }),
+                    });
                     updateTable(data.id, { color: defaultBlue });
                   }}
                   onPickColor={(c) => {
-                    setUndoStack((prev) => [
-                      ...prev,
-                      {
-                        action: Action.EDIT,
-                        element: ObjectType.TABLE,
-                        component: "self",
-                        tid: data.id,
-                        undo: { color: data.color },
-                        redo: { color: c },
-                        message: t("edit_table", {
-                          tableName: data.name,
-                          extra: "[color]",
-                        }),
-                      },
-                    ]);
-                    setRedoStack([]);
+                    pushUndo({
+                      action: Action.EDIT,
+                      element: ObjectType.TABLE,
+                      component: "self",
+                      tid: data.id,
+                      undo: { color: data.color },
+                      redo: { color: c },
+                      message: t("edit_table", {
+                        tableName: data.name,
+                        extra: "[color]",
+                      }),
+                    });
                     updateTable(data.id, { color: c });
                   }}
                 />
@@ -297,20 +281,16 @@ export default function TableInfo({ data }) {
             block
             onClick={() => {
               setIndexActiveKey("1");
-              setUndoStack((prev) => [
-                ...prev,
-                {
-                  action: Action.EDIT,
-                  element: ObjectType.TABLE,
-                  component: "index_add",
-                  tid: data.id,
-                  message: t("edit_table", {
-                    tableName: data.name,
-                    extra: "[add index]",
-                  }),
-                },
-              ]);
-              setRedoStack([]);
+              pushUndo({
+                action: Action.EDIT,
+                element: ObjectType.TABLE,
+                component: "index_add",
+                tid: data.id,
+                message: t("edit_table", {
+                  tableName: data.name,
+                  extra: "[add index]",
+                }),
+              });
               updateTable(data.id, {
                 indices: [
                   ...data.indices,
@@ -329,17 +309,16 @@ export default function TableInfo({ data }) {
           </Button>
           <Button
             onClick={() => {
-                createNewField({
+                  createNewField({
                     data,
                     settings,
                     database,
                     dbToTypes,
                     addFieldToTable,
-                    setUndoStack,
-                    setRedoStack,
+                    pushUndo,
                     t,
                     tid: data.id,
-                });
+                  });
             }}
             block
             className="flex-grow"

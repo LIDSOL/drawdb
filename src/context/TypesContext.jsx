@@ -9,7 +9,7 @@ export const TypesContext = createContext(null);
 export default function TypesContextProvider({ children }) {
   const { t } = useTranslation();
   const [types, setTypes] = useState([]);
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
 
   const addType = (data, addToHistory = true) => {
     if (data) {
@@ -29,34 +29,26 @@ export default function TypesContextProvider({ children }) {
       ]);
     }
     if (addToHistory) {
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.ADD,
-          element: ObjectType.TYPE,
-          message: t("add_type"),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.ADD,
+        element: ObjectType.TYPE,
+        message: t("add_type"),
+      });
     }
   };
 
   const deleteType = (id, addToHistory = true) => {
     if (addToHistory) {
       Toast.success(t("type_deleted"));
-      setUndoStack((prev) => [
-        ...prev,
-        {
-          action: Action.DELETE,
-          element: ObjectType.TYPE,
-          id: id,
-          data: types[id],
-          message: t("delete_type", {
-            typeName: types[id].name,
-          }),
-        },
-      ]);
-      setRedoStack([]);
+      pushUndo({
+        action: Action.DELETE,
+        element: ObjectType.TYPE,
+        id: id,
+        data: types[id],
+        message: t("delete_type", {
+          typeName: types[id].name,
+        }),
+      });
     }
     setTypes((prev) => prev.filter((e, i) => i !== id));
   };

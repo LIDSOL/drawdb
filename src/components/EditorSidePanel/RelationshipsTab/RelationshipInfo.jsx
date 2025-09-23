@@ -39,7 +39,7 @@ const columns = [
 ];
 
 export default function RelationshipInfo({ data }) {
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+  const { pushUndo } = useUndoRedo();
   const { settings } = useSettings();
   const {
     tables,
@@ -85,31 +85,27 @@ export default function RelationshipInfo({ data }) {
       return;
     }
     const effectiveEndTable = getEffectiveEndTable();
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        rid: data.id,
-        undo: {
-          startTableId: data.startTableId,
-          startFieldId: data.startFieldId,
-          endTableId: effectiveEndTable.tableId,
-          endFieldId: effectiveEndTable.fieldId,
-        },
-        redo: {
-          startTableId: effectiveEndTable.tableId,
-          startFieldId: effectiveEndTable.fieldId,
-          endTableId: data.startTableId,
-          endFieldId: data.startFieldId,
-        },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[swap keys]",
-        }),
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: {
+        startTableId: data.startTableId,
+        startFieldId: data.startFieldId,
+        endTableId: effectiveEndTable.tableId,
+        endFieldId: effectiveEndTable.fieldId,
       },
-    ]);
-    setRedoStack([]);
+      redo: {
+        startTableId: effectiveEndTable.tableId,
+        startFieldId: effectiveEndTable.fieldId,
+        endTableId: data.startTableId,
+        endFieldId: data.startFieldId,
+      },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[swap keys]",
+      }),
+    });
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id
@@ -147,31 +143,27 @@ export default function RelationshipInfo({ data }) {
       ? SubtypeRestriction.DISJOINT_TOTAL
       : undefined;
 
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        rid: data.id,
-        undo: {
-          relationshipType: data.relationshipType,
-          cardinality: data.cardinality,
-          subtype: data.subtype,
-          subtype_restriction: data.subtype_restriction,
-        },
-        redo: {
-          relationshipType: value,
-          cardinality: defaultCardinality,
-          subtype: isBecomingSubtype,
-          subtype_restriction: defaultSubtypeRestriction,
-        },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[relationship type]",
-        }),
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: {
+        relationshipType: data.relationshipType,
+        cardinality: data.cardinality,
+        subtype: data.subtype,
+        subtype_restriction: data.subtype_restriction,
       },
-    ]);
-    setRedoStack([]);
+      redo: {
+        relationshipType: value,
+        cardinality: defaultCardinality,
+        subtype: isBecomingSubtype,
+        subtype_restriction: defaultSubtypeRestriction,
+      },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[relationship type]",
+      }),
+    });
 
     // When becoming subtype, convert existing FK fields to primary keys
     if (isBecomingSubtype && !wasSubtype) {
@@ -227,21 +219,17 @@ export default function RelationshipInfo({ data }) {
   };
 
   const changeCardinality = (value) => {
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        rid: data.id,
-        undo: { cardinality: data.cardinality },
-        redo: { cardinality: value },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[cardinality]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: { cardinality: data.cardinality },
+      redo: { cardinality: value },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[cardinality]",
+      }),
+    });
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id ? { ...e, cardinality: value } : e,
@@ -250,21 +238,17 @@ export default function RelationshipInfo({ data }) {
   };
 
   const changeSubtypeRestriction = (value) => {
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        rid: data.id,
-        undo: { subtype_restriction: data.subtype_restriction },
-        redo: { subtype_restriction: value },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[subtype_restriction]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: { subtype_restriction: data.subtype_restriction },
+      redo: { subtype_restriction: value },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[subtype_restriction]",
+      }),
+    });
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id ? { ...e, subtype_restriction: value } : e,
@@ -274,21 +258,17 @@ export default function RelationshipInfo({ data }) {
 
   const changeConstraint = (key, value) => {
     const undoKey = `${key}Constraint`;
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        rid: data.id,
-        undo: { [undoKey]: data[undoKey] },
-        redo: { [undoKey]: value },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[constraint]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: { [undoKey]: data[undoKey] },
+      redo: { [undoKey]: value },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[constraint]",
+      }),
+    });
     setRelationships((prev) =>
       prev.map((e, idx) => (idx === data.id ? { ...e, [undoKey]: value } : e)),
     );
@@ -340,23 +320,19 @@ export default function RelationshipInfo({ data }) {
       notNull: newNotNullValue,
     }));
 
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.TABLE,
-        component: "field",
-        tid: effectiveEndTable.tableId,
-        fid: fkFieldIds,
-        undo: { fields: undoFields },
-        redo: { fields: redoFields },
-        message: t("edit_relationship", {
-          refName: data.name,
-          extra: "[parent cardinality]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.TABLE,
+      component: "field",
+      tid: effectiveEndTable.tableId,
+      fid: fkFieldIds,
+      undo: { fields: undoFields },
+      redo: { fields: redoFields },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[parent cardinality]",
+      }),
+    });
 
     setTables((prevTables) =>
       prevTables.map((table) => {
@@ -393,22 +369,18 @@ export default function RelationshipInfo({ data }) {
 
     if (data.name === defaultName) return; // Already has default name
 
-    setUndoStack((prev) => [
-      ...prev,
-      {
-        action: Action.EDIT,
-        element: ObjectType.RELATIONSHIP,
-        component: "self",
-        rid: data.id,
-        undo: { name: data.name },
-        redo: { name: defaultName },
-        message: t("edit_relationship", {
-          refName: defaultName,
-          extra: "[set default name]",
-        }),
-      },
-    ]);
-    setRedoStack([]);
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      component: "self",
+      rid: data.id,
+      undo: { name: data.name },
+      redo: { name: defaultName },
+      message: t("edit_relationship", {
+        refName: defaultName,
+        extra: "[set default name]",
+      }),
+    });
     updateRelationship(data.id, { name: defaultName });
   };
 
@@ -436,22 +408,18 @@ export default function RelationshipInfo({ data }) {
           onFocus={(e) => setEditField({ name: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
-            setUndoStack((prev) => [
-              ...prev,
-              {
-                action: Action.EDIT,
-                element: ObjectType.RELATIONSHIP,
-                component: "self",
-                rid: data.id,
-                undo: editField,
-                redo: { name: e.target.value },
-                message: t("edit_relationship", {
-                  refName: e.target.value,
-                  extra: "[name]",
-                }),
-              },
-            ]);
-            setRedoStack([]);
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.RELATIONSHIP,
+              component: "self",
+              rid: data.id,
+              undo: editField,
+              redo: { name: e.target.value },
+              message: t("edit_relationship", {
+                refName: e.target.value,
+                extra: "[name]",
+              }),
+            });
           }}
         />
       </div>

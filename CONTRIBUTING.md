@@ -64,6 +64,42 @@ Please follow these steps to have your contribution considered by the maintainer
 - Ensure your code passes ESLint.
 - Make sure the code base is in English, this includes comments and variable names.
 
+## Undo/Redo: pushUndo vs setUndoStack
+
+When recording history, prefer the high-level helper `pushUndo(action)` from UI/components for simple append-and-clear behavior. `pushUndo` centralizes validation, deduplication and coalescing so the app maintains a sane undo/redo history.
+
+However, some modules implement the low-level undo/redo engine and must manipulate the stacks directly using `setUndoStack` / `setRedoStack`. Do NOT replace those internal usages with `pushUndo`.
+
+Files that intentionally use direct stack manipulation include (but are not limited to):
+
+- `src/components/EditorCanvas/Canvas.jsx`
+- `src/components/EditorHeader/ControlPanel.jsx`
+- `src/components/EditorHeader/Modal/Modal.jsx`
+- `src/components/Workspace.jsx`
+- `src/context/UndoRedoContext.jsx`
+
+Correct usage (UI-side append+clear):
+```js
+// Add a simple EDIT action and clear redo
+pushUndo({
+    action: Action.EDIT,
+    element: ObjectType.TABLE,
+    tid,
+    undo,
+    redo,
+    message,
+});
+```
+
+Incorrect to change internal code to this (keep low-level code as-is):
+```js
+// Internal undo engine — keep setUndoStack for low-level manipulation
+setUndoStack((prev) => prev.filter((_, i) => i !== prev.length - 1));
+setRedoStack((prev) => [...prev, action]);
+```
+
+If you're unsure which to use, prefer `pushUndo` for component-level changes and ask during code review for anything touching the stacks directly.
+
 ## Additional Notes
 
 ### Issue and Pull Request Labels
@@ -87,3 +123,4 @@ If you have any questions, please feel free to reach out to us through the follo
 ---
 
 Thank you for your contributions! ❤️
+

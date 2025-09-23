@@ -7,8 +7,8 @@ import { useState } from "react";
 
 export default function IndexDetails({ data, fields, iid, tid }) {
   const { t } = useTranslation();
-  const { tables, updateTable } = useDiagram();
-  const { setUndoStack, setRedoStack } = useUndoRedo();
+    const { tables, updateTable } = useDiagram();
+    const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
 
   return (
@@ -38,9 +38,7 @@ export default function IndexDetails({ data, fields, iid, tid }) {
                 }
                 onBlur={(e) => {
                     if (e.target.value === editField.name) return;
-                    setUndoStack((prev) => [
-                    ...prev,
-                    {
+                    pushUndo({
                         action: Action.EDIT,
                         element: ObjectType.TABLE,
                         component: "index",
@@ -49,12 +47,10 @@ export default function IndexDetails({ data, fields, iid, tid }) {
                         undo: editField,
                         redo: { name: e.target.value },
                         message: t("edit_table", {
-                        tableName: tables[tid].name,
-                        extra: "[index]",
+                            tableName: tables[tid].name,
+                            extra: "[index]",
                         }),
-                    },
-                    ]);
-                    setRedoStack([]);
+                    });
                 }}
                 />
             </Col>
@@ -64,29 +60,23 @@ export default function IndexDetails({ data, fields, iid, tid }) {
                     value="unique"
                     checked={data.unique}
                     onChange={(checkedValues) => {
-                    setUndoStack((prev) => [
-                        ...prev,
-                        {
+                    pushUndo({
                         action: Action.EDIT,
                         element: ObjectType.TABLE,
                         component: "index",
                         tid: tid,
                         iid: iid,
                         undo: {
-                            [checkedValues.target.value]:
-                            !checkedValues.target.checked,
+                            [checkedValues.target.value]: !checkedValues.target.checked,
                         },
                         redo: {
-                            [checkedValues.target.value]:
-                            checkedValues.target.checked,
+                            [checkedValues.target.value]: checkedValues.target.checked,
                         },
                         message: t("edit_table", {
                             tableName: tables[tid].name,
                             extra: "[index field]",
                         }),
-                        },
-                    ]);
-                    setRedoStack([]);
+                    });
                     updateTable(tid, {
                         indices: tables[tid].indices.map((index) =>
                         index.id === iid
@@ -112,27 +102,19 @@ export default function IndexDetails({ data, fields, iid, tid }) {
                     className="w-full"
                     value={data.fields}
                     onChange={(value) => {
-                    setUndoStack((prev) => [
-                        ...prev,
-                        {
+                    pushUndo({
                         action: Action.EDIT,
                         element: ObjectType.TABLE,
                         component: "index",
                         tid: tid,
                         iid: iid,
-                        undo: {
-                            fields: [...data.fields],
-                        },
-                        redo: {
-                        fields: [...value],
-                        },
+                        undo: { fields: [...data.fields] },
+                        redo: { fields: [...value] },
                         message: t("edit_table", {
                             tableName: tables[tid].name,
                             extra: "[index field]",
                         }),
-                        },
-                    ]);
-                    setRedoStack([]);
+                    });
                     updateTable(tid, {
                         indices: tables[tid].indices.map((index) =>
                         index.id === iid
@@ -151,28 +133,24 @@ export default function IndexDetails({ data, fields, iid, tid }) {
                 icon={<IconDeleteStroked />}
                 type="danger"
                 onClick={() => {
-                    setUndoStack((prev) => [
-                    ...prev,
-                    {
+                    pushUndo({
                         action: Action.EDIT,
                         element: ObjectType.TABLE,
                         component: "index_delete",
                         tid: tid,
                         data: data,
                         message: t("edit_table", {
-                        tableName: tables[tid].name,
-                        extra: "[delete index]",
+                            tableName: tables[tid].name,
+                            extra: "[delete index]",
                         }),
-                    },
-                    ]);
-                    setRedoStack([]);
+                    });
                     updateTable(tid, {
-                    indices: tables[tid].indices
-                        .filter((e) => e.id !== iid)
-                        .map((e, j) => ({
-                        ...e,
-                        id: j,
-                        })),
+                        indices: tables[tid].indices
+                            .filter((e) => e.id !== iid)
+                            .map((e, j) => ({
+                                ...e,
+                                id: j,
+                            })),
                     });
                 }}
                 >
