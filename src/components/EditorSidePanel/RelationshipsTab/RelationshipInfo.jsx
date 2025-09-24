@@ -304,6 +304,7 @@ export default function RelationshipInfo({ data }) {
       return;
     }
 
+    const timestamp = Date.now();
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
@@ -312,7 +313,7 @@ export default function RelationshipInfo({ data }) {
       redo: { cardinality: trimmedCardinality },
       message: t("edit_relationship", {
         refName: data.name,
-        extra: "[cardinality]",
+        extra: `[cardinality-${timestamp}]`,
       }),
     });
     setRelationships((prev) =>
