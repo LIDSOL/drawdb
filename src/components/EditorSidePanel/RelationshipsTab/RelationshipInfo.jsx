@@ -51,6 +51,7 @@ export default function RelationshipInfo({ data }) {
   } = useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
+  const [customCardinality, setCustomCardinality] = useState("");
   // Helper function to get the effective end table ID and field ID
   const getEffectiveEndTable = () => {
     if (data.endTableId !== undefined) {
@@ -219,6 +220,11 @@ export default function RelationshipInfo({ data }) {
   };
 
   const changeCardinality = (value) => {
+    if (value === "Custom...") {
+      setCustomCardinality(data.cardinality || "");
+      return;
+    }
+
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
@@ -235,6 +241,90 @@ export default function RelationshipInfo({ data }) {
         idx === data.id ? { ...e, cardinality: value } : e,
       ),
     );
+  };
+
+  const handleCustomCardinalityChange = (value) => {
+    setCustomCardinality(value);
+  };
+
+  const validateCustomCardinality = (cardinality) => {
+    // Check if it matches the pattern (x,y) where x and y are numbers
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) {
+      return {
+        valid: false,
+        message: t(
+          "cardinality_format_error",
+          "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
+        ),
+      };
+    }
+
+    const first = parseInt(match[1]);
+    const second = match[2];
+
+    // First coordinate must be 0 or 1
+    if (first !== 0 && first !== 1) {
+      return {
+        valid: false,
+        message: t(
+          "cardinality_first_error",
+          "First coordinate must be 0 or 1",
+        ),
+      };
+    }
+
+    // Second coordinate must be * or a number greater than 1
+    if (second !== "*") {
+      const secondNum = parseInt(second);
+      if (isNaN(secondNum) || secondNum < 2) {
+        return {
+          valid: false,
+          message: t(
+            "cardinality_second_error",
+            "Second coordinate must be greater than 1 or *",
+          ),
+        };
+      }
+    }
+
+    return { valid: true };
+  };
+
+  const applyCustomCardinality = () => {
+    const trimmedCardinality = customCardinality.trim();
+    if (trimmedCardinality === "") {
+      return;
+    }
+
+    // Validate the custom cardinality
+    const validation = validateCustomCardinality(trimmedCardinality);
+    if (!validation.valid) {
+      Toast.error(validation.message);
+      return;
+    }
+
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: { cardinality: data.cardinality },
+      redo: { cardinality: trimmedCardinality },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: "[cardinality]",
+      }),
+    });
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, cardinality: trimmedCardinality } : e,
+      ),
+    );
+    setCustomCardinality("");
+  };
+
+  const cancelCustomCardinality = () => {
+    setCustomCardinality("");
   };
 
   const changeSubtypeRestriction = (value) => {
@@ -504,31 +594,69 @@ export default function RelationshipInfo({ data }) {
         data.relationshipType !== RelationshipType.SUBTYPE && (
           <>
             <div className="font-semibold my-1">{t("cardinality")}:</div>
-            <div className="flex items-center w-full gap-2">
-              <Select
-                optionList={
-                  RelationshipCardinalities[data.relationshipType] &&
-                  RelationshipCardinalities[data.relationshipType].map((c) => ({
-                    label: c.label,
-                    value: c.label,
-                  }))
-                }
-                value={data.cardinality}
-                className="w-full"
-                onChange={changeCardinality}
-                disabled={!data.relationshipType}
-                placeholder={t("select_cardinality")}
-              />
-              {(settings.notation === Notation.CROWS_FOOT ||
-                settings.notation === Notation.IDEF1X) && (
-                <Button
-                  icon={<IconLoopTextStroked />}
-                  type="tertiary"
-                  onClick={toggleParentCardinality}
-                  aria-label="Toggle Parent Cardinality"
+            {customCardinality !== "" ? (
+              // Custom cardinality input mode
+              <div className="space-y-2">
+                <Input
+                  value={customCardinality}
+                  onChange={handleCustomCardinalityChange}
+                  placeholder={
+                    t("enter_custom_cardinality") ||
+                    "Enter cardinality: (0 or 1, number >1 or *). E.g., (0,5), (1,*)"
+                  }
+                  className="w-full"
                 />
-              )}
-            </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Format: (x,y) where x is 0 or 1, and y is greater than 1 or *
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="small"
+                    type="primary"
+                    onClick={applyCustomCardinality}
+                    disabled={customCardinality.trim() === ""}
+                  >
+                    {t("apply") || "Apply"}
+                  </Button>
+                  <Button
+                    size="small"
+                    type="secondary"
+                    onClick={cancelCustomCardinality}
+                  >
+                    {t("cancel") || "Cancel"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Normal cardinality selection
+              <div className="flex items-center w-full gap-2">
+                <Select
+                  optionList={
+                    RelationshipCardinalities[data.relationshipType] &&
+                    RelationshipCardinalities[data.relationshipType].map(
+                      (c) => ({
+                        label: c.label,
+                        value: c.label,
+                      }),
+                    )
+                  }
+                  value={data.cardinality}
+                  className="w-full"
+                  onChange={changeCardinality}
+                  disabled={!data.relationshipType}
+                  placeholder={t("select_cardinality")}
+                />
+                {(settings.notation === Notation.CROWS_FOOT ||
+                  settings.notation === Notation.IDEF1X) && (
+                  <Button
+                    icon={<IconLoopTextStroked />}
+                    type="tertiary"
+                    onClick={toggleParentCardinality}
+                    aria-label="Toggle Parent Cardinality"
+                  />
+                )}
+              </div>
+            )}
           </>
         )}
       {/* Subtype restriction - only available when relationship type is SUBTYPE */}
