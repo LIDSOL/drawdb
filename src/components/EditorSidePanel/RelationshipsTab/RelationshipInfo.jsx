@@ -26,7 +26,7 @@ import {
 import { useDiagram, useSettings, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 const columns = [
   {
     title: i18n.t("primary"),
@@ -52,6 +52,16 @@ export default function RelationshipInfo({ data }) {
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
   const [customCardinality, setCustomCardinality] = useState("");
+  const customInputRef = useRef(null);
+
+  // Auto focus on custom cardinality input when it appears
+  useEffect(() => {
+    if (customCardinality !== "" && customInputRef.current) {
+      setTimeout(() => {
+        customInputRef.current?.focus();
+      }, 0);
+    }
+  }, [customCardinality]);
   // Helper function to get the effective end table ID and field ID
   const getEffectiveEndTable = () => {
     if (data.endTableId !== undefined) {
@@ -245,6 +255,16 @@ export default function RelationshipInfo({ data }) {
 
   const handleCustomCardinalityChange = (value) => {
     setCustomCardinality(value);
+  };
+
+  const handleCustomCardinalityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyCustomCardinality();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelCustomCardinality();
+    }
   };
 
   const validateCustomCardinality = (cardinality) => {
@@ -599,8 +619,10 @@ export default function RelationshipInfo({ data }) {
               // Custom cardinality input mode
               <div className="space-y-2">
                 <Input
+                  ref={customInputRef}
                   value={customCardinality}
                   onChange={handleCustomCardinalityChange}
+                  onKeyDown={handleCustomCardinalityKeyDown}
                   placeholder={
                     t("enter_custom_cardinality") ||
                     "Enter cardinality: (0 or 1, number >1 or *). E.g., (0,5), (1,*)"
@@ -609,6 +631,8 @@ export default function RelationshipInfo({ data }) {
                 />
                 <div className="text-xs text-gray-500 mt-1">
                   Format: (x,y) where x is 0 or 1, and y is greater than 1 or *
+                  <br />
+                  Press Enter to apply, Escape to cancel
                 </div>
                 <div className="flex gap-2">
                   <Button
