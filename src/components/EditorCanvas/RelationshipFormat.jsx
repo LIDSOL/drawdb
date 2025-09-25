@@ -3,7 +3,7 @@ export function CrowParentLines(
   cardinalityStartY,
   direction,
   isVertical = false,
-  cardinalityText = ""
+  cardinalityText = "",
 ) {
   const offsetDistance = 6;
   const lineOffset = 10;
@@ -13,18 +13,18 @@ export function CrowParentLines(
       <>
         <line
           x1={cardinalityStartX - lineOffset}
-          y1={cardinalityStartY - (offsetDistance * direction)}
+          y1={cardinalityStartY - offsetDistance * direction}
           x2={cardinalityStartX + lineOffset}
-          y2={cardinalityStartY - (offsetDistance * direction)}
+          y2={cardinalityStartY - offsetDistance * direction}
           stroke="gray"
           strokeWidth="2"
           className="group-hover:stroke-sky-700"
         />
         <line
           x1={cardinalityStartX - lineOffset}
-          y1={cardinalityStartY - (2 * direction)}
+          y1={cardinalityStartY - 2 * direction}
           x2={cardinalityStartX + lineOffset}
-          y2={cardinalityStartY - (2 * direction)}
+          y2={cardinalityStartY - 2 * direction}
           stroke="gray"
           strokeWidth="2"
           className="group-hover:stroke-sky-700"
@@ -47,18 +47,18 @@ export function CrowParentLines(
     return (
       <>
         <line
-          x1={cardinalityStartX - (offsetDistance * direction)}
+          x1={cardinalityStartX - offsetDistance * direction}
           y1={cardinalityStartY + lineOffset}
-          x2={cardinalityStartX - (offsetDistance * direction)}
+          x2={cardinalityStartX - offsetDistance * direction}
           y2={cardinalityStartY - lineOffset}
           stroke="gray"
           strokeWidth="2"
           className="group-hover:stroke-sky-700"
         />
         <line
-          x1={cardinalityStartX - (2 * direction)}
+          x1={cardinalityStartX - 2 * direction}
           y1={cardinalityStartY + lineOffset}
-          x2={cardinalityStartX - (2 * direction)}
+          x2={cardinalityStartX - 2 * direction}
           y2={cardinalityStartY - lineOffset}
           stroke="gray"
           strokeWidth="2"
@@ -86,7 +86,7 @@ export function CrowParentDiamond(
   cardinalityStartY,
   direction,
   isVertical = false,
-  cardinalityText = ""
+  cardinalityText = "",
 ) {
   const offsetDistance = 12;
   const diamondSize = 6;
@@ -97,10 +97,10 @@ export function CrowParentDiamond(
       <>
         <polygon
           points={`
-            ${cardinalityStartX},${cardinalityStartY - (8 * direction)}
-            ${cardinalityStartX - diamondSize},${cardinalityStartY - (offsetDistance * direction)}
-            ${cardinalityStartX},${cardinalityStartY - (16 * direction)}
-            ${cardinalityStartX + diamondSize},${cardinalityStartY - (offsetDistance * direction)}
+            ${cardinalityStartX},${cardinalityStartY - 8 * direction}
+            ${cardinalityStartX - diamondSize},${cardinalityStartY - offsetDistance * direction}
+            ${cardinalityStartX},${cardinalityStartY - 16 * direction}
+            ${cardinalityStartX + diamondSize},${cardinalityStartY - offsetDistance * direction}
           `}
           stroke="gray"
           strokeWidth="2"
@@ -126,10 +126,10 @@ export function CrowParentDiamond(
       <>
         <polygon
           points={`
-            ${cardinalityStartX + offset - (8 * direction)},${cardinalityStartY}
-            ${cardinalityStartX + offset - (offsetDistance * direction)},${cardinalityStartY - diamondSize}
-            ${cardinalityStartX + offset - (16 * direction)},${cardinalityStartY}
-            ${cardinalityStartX + offset - (offsetDistance * direction)},${cardinalityStartY + diamondSize}
+            ${cardinalityStartX + offset - 8 * direction},${cardinalityStartY}
+            ${cardinalityStartX + offset - offsetDistance * direction},${cardinalityStartY - diamondSize}
+            ${cardinalityStartX + offset - 16 * direction},${cardinalityStartY}
+            ${cardinalityStartX + offset - offsetDistance * direction},${cardinalityStartY + diamondSize}
           `}
           stroke="gray"
           strokeWidth="2"
@@ -164,16 +164,21 @@ export function CrowsFootChild(
   cardinalityEnd,
   showCardinality = true,
   isVertical = false,
-  vectorInfo = null
+  vectorInfo = null,
 ) {
-  const isMandatory = cardinalityEnd.startsWith("(1"); // (1,1) o (1,*)
-  const isOptional = cardinalityEnd.startsWith("(0");  // (0,1) o (0,*)
-  const isMany = cardinalityEnd.endsWith("*)");         // (1,*) o (0,*)
-  const isOne = cardinalityEnd.endsWith("1)");          // (1,1) o (0,1)
+  const isMandatory = cardinalityEnd.startsWith("(1"); // (1,1) o (1,*) o (1,10)
+  const isOptional = cardinalityEnd.startsWith("(0"); // (0,1) o (0,*) o (0,10)
+  const isMany =
+    cardinalityEnd.endsWith("*)") ||
+    (cardinalityEnd.includes(",") && !cardinalityEnd.endsWith("1)")); // (1,*) o (0,*) o (1,10) o (0,5)
+  const isOne = cardinalityEnd.endsWith("1)"); // (1,1) o (0,1)
   // Calculate the actual direction vector if we have vector information
-  let dx = 1, dy = 0; // Default to right-pointing
+  let dx = 1,
+    dy = 0; // Default to right-pointing
   if (vectorInfo) {
-    const magnitude = Math.sqrt(vectorInfo.dx * vectorInfo.dx + vectorInfo.dy * vectorInfo.dy);
+    const magnitude = Math.sqrt(
+      vectorInfo.dx * vectorInfo.dx + vectorInfo.dy * vectorInfo.dy,
+    );
     if (magnitude > 0) {
       dx = vectorInfo.dx / magnitude;
       dy = vectorInfo.dy / magnitude;
@@ -190,27 +195,27 @@ export function CrowsFootChild(
       // For vertical relationships, position cardinalities to the side
       return {
         x: isStart ? x - 25 : x + 35, // Child side (end) further away from table for clarity
-        y: y // Same vertical level as the notation
+        y: y, // Same vertical level as the notation
       };
     } else {
       return {
         x: isStart ? x - 8 : x + 15,
-        y: y - 20 // Above the line for horizontal relationships
+        y: y - 20, // Above the line for horizontal relationships
       };
     }
   };
 
   // Base distances from table edge - CORRECTED ORDER
   // Note: cardinalityEndX/Y are already offset by 35px from table edge in Relationship.jsx
-  const crowsFootOffset = 6;               // Crow's foot closer to table (reduced due to existing 35px offset)
-  const elementOffset = 12;                // Bars/circles further from table (reduced due to existing 35px offset)
-  const lineLength = 8;                    // Half length of bars
+  const crowsFootOffset = 6; // Crow's foot closer to table (reduced due to existing 35px offset)
+  const elementOffset = 12; // Bars/circles further from table (reduced due to existing 35px offset)
+  const lineLength = 8; // Half length of bars
 
   // Calculate positions along the line direction
-  const crowsFootX = cardinalityEndX - (dx * crowsFootOffset);
-  const crowsFootY = cardinalityEndY - (dy * crowsFootOffset);
-  const elementX = cardinalityEndX - (dx * elementOffset);
-  const elementY = cardinalityEndY - (dy * elementOffset);
+  const crowsFootX = cardinalityEndX - dx * crowsFootOffset;
+  const crowsFootY = cardinalityEndY - dy * crowsFootOffset;
+  const elementX = cardinalityEndX - dx * elementOffset;
+  const elementY = cardinalityEndY - dy * elementOffset;
 
   return (
     pathRef && (
@@ -233,10 +238,10 @@ export function CrowsFootChild(
         {isMandatory && isMany && (
           <>
             <line
-              x1={crowsFootX - (perpX * lineLength)}
-              y1={crowsFootY - (perpY * lineLength)}
-              x2={crowsFootX + (perpX * lineLength)}
-              y2={crowsFootY + (perpY * lineLength)}
+              x1={crowsFootX - perpX * lineLength}
+              y1={crowsFootY - perpY * lineLength}
+              x2={crowsFootX + perpX * lineLength}
+              y2={crowsFootY + perpY * lineLength}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -248,8 +253,8 @@ export function CrowsFootChild(
         {isOptional && isOne && (
           <>
             <circle
-              cx={cardinalityEndX - (dx * 8)}
-              cy={cardinalityEndY - (dy * 8)}
+              cx={cardinalityEndX - dx * 8}
+              cy={cardinalityEndY - dy * 8}
               r="4"
               stroke="gray"
               strokeWidth="2"
@@ -257,10 +262,10 @@ export function CrowsFootChild(
               className="group-hover:stroke-sky-700"
             />
             <line
-              x1={cardinalityEndX - (dx * 3) - (perpX * lineLength)}
-              y1={cardinalityEndY - (dy * 3) - (perpY * lineLength)}
-              x2={cardinalityEndX - (dx * 3) + (perpX * lineLength)}
-              y2={cardinalityEndY - (dy * 3) + (perpY * lineLength)}
+              x1={cardinalityEndX - dx * 3 - perpX * lineLength}
+              y1={cardinalityEndY - dy * 3 - perpY * lineLength}
+              x2={cardinalityEndX - dx * 3 + perpX * lineLength}
+              y2={cardinalityEndY - dy * 3 + perpY * lineLength}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -272,19 +277,19 @@ export function CrowsFootChild(
         {isMandatory && isOne && (
           <>
             <line
-              x1={cardinalityEndX - (dx * 10) - (perpX * lineLength)}
-              y1={cardinalityEndY - (dy * 10) - (perpY * lineLength)}
-              x2={cardinalityEndX - (dx * 10) + (perpX * lineLength)}
-              y2={cardinalityEndY - (dy * 10) + (perpY * lineLength)}
+              x1={cardinalityEndX - dx * 10 - perpX * lineLength}
+              y1={cardinalityEndY - dy * 10 - perpY * lineLength}
+              x2={cardinalityEndX - dx * 10 + perpX * lineLength}
+              y2={cardinalityEndY - dy * 10 + perpY * lineLength}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
             />
             <line
-              x1={cardinalityEndX - (dx * 6) - (perpX * lineLength)}
-              y1={cardinalityEndY - (dy * 6) - (perpY * lineLength)}
-              x2={cardinalityEndX - (dx * 6) + (perpX * lineLength)}
-              y2={cardinalityEndY - (dy * 6) + (perpY * lineLength)}
+              x1={cardinalityEndX - dx * 6 - perpX * lineLength}
+              y1={cardinalityEndY - dy * 6 - perpY * lineLength}
+              x2={cardinalityEndX - dx * 6 + perpX * lineLength}
+              y2={cardinalityEndY - dy * 6 + perpY * lineLength}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -296,8 +301,8 @@ export function CrowsFootChild(
             <line
               x1={crowsFootX}
               y1={crowsFootY}
-              x2={crowsFootX + (dx * 12) - (perpX * 10)}
-              y2={crowsFootY + (dy * 12) - (perpY * 10)}
+              x2={crowsFootX + dx * 12 - perpX * 10}
+              y2={crowsFootY + dy * 12 - perpY * 10}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -305,8 +310,8 @@ export function CrowsFootChild(
             <line
               x1={crowsFootX}
               y1={crowsFootY}
-              x2={crowsFootX + (dx * 12) + (perpX * 10)}
-              y2={crowsFootY + (dy * 12) + (perpY * 10)}
+              x2={crowsFootX + dx * 12 + perpX * 10}
+              y2={crowsFootY + dy * 12 + perpY * 10}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -314,8 +319,8 @@ export function CrowsFootChild(
             <line
               x1={crowsFootX}
               y1={crowsFootY}
-              x2={crowsFootX + (dx * 14)}
-              y2={crowsFootY + (dy * 14)}
+              x2={crowsFootX + dx * 14}
+              y2={crowsFootY + dy * 14}
               stroke="gray"
               strokeWidth="2"
               className="group-hover:stroke-sky-700"
@@ -326,8 +331,16 @@ export function CrowsFootChild(
         {showCardinality && (
           <>
             {(() => {
-              const startPos = getCardinalityPosition(cardinalityStartX, cardinalityStartY, true);
-              const endPos = getCardinalityPosition(cardinalityEndX, cardinalityEndY, false);
+              const startPos = getCardinalityPosition(
+                cardinalityStartX,
+                cardinalityStartY,
+                true,
+              );
+              const endPos = getCardinalityPosition(
+                cardinalityEndX,
+                cardinalityEndY,
+                false,
+              );
               return (
                 <>
                   <text
@@ -370,46 +383,46 @@ export function DefaultNotation(
   cardinalityStart,
   cardinalityEnd,
 ) {
-  return(
-      pathRef && (
-        <g>
-            <circle
-              cx={cardinalityStartX}
-              cy={cardinalityStartY}
-              r="16"
-              fill="grey"
-              className="group-hover:fill-sky-700"
-            />
-            <text
-              x={cardinalityStartX}
-              y={cardinalityStartY}
-              fill="white"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityStart}
-            </text>
-            <circle
-              cx={cardinalityEndX}
-              cy={cardinalityEndY}
-              r="16"
-              fill="grey"
-              className="group-hover:fill-sky-700"
-            />
-            <text
-              x={cardinalityEndX}
-              y={cardinalityEndY}
-              fill="white"
-              strokeWidth="0.5"
-              textAnchor="middle"
-              alignmentBaseline="middle"
-            >
-              {cardinalityEnd}
-            </text>
-          </g>
-      )
-  )
+  return (
+    pathRef && (
+      <g>
+        <circle
+          cx={cardinalityStartX}
+          cy={cardinalityStartY}
+          r="16"
+          fill="grey"
+          className="group-hover:fill-sky-700"
+        />
+        <text
+          x={cardinalityStartX}
+          y={cardinalityStartY}
+          fill="white"
+          strokeWidth="0.5"
+          textAnchor="middle"
+          alignmentBaseline="middle"
+        >
+          {cardinalityStart}
+        </text>
+        <circle
+          cx={cardinalityEndX}
+          cy={cardinalityEndY}
+          r="16"
+          fill="grey"
+          className="group-hover:fill-sky-700"
+        />
+        <text
+          x={cardinalityEndX}
+          y={cardinalityEndY}
+          fill="white"
+          strokeWidth="0.5"
+          textAnchor="middle"
+          alignmentBaseline="middle"
+        >
+          {cardinalityEnd}
+        </text>
+      </g>
+    )
+  );
 }
 
 export function IDEFZM(
@@ -423,23 +436,29 @@ export function IDEFZM(
   cardinalityEnd,
   showCardinality = true,
   isVertical = false,
-  vectorInfo = null
+  vectorInfo = null,
 ) {
   let letter = null;
-  switch (cardinalityEnd) {
-    case "(1,*)":
-      letter = "P";
-      break;
-    case "(1,1)":
-      letter = "L";
-      break;
-    case "(0,1)":
-      letter = "Z";
-      break;
+
+  if (cardinalityEnd.startsWith("(1") && cardinalityEnd.endsWith("1)")) {
+    letter = "L";
+  } else if (
+    cardinalityEnd.startsWith("(1") &&
+    (cardinalityEnd.endsWith("*)") ||
+      (cardinalityEnd.includes(",") && !cardinalityEnd.endsWith("1)")))
+  ) {
+    // (1,*) or (1,X) where X is not 1 - one to many (like (1,10), (1,5))
+    letter = "P";
+  } else if (cardinalityEnd.startsWith("(0") && cardinalityEnd.endsWith("1)")) {
+    // (0,1) - zero or one
+    letter = "Z";
   }
-  let dx = 1, dy = 0;
+  let dx = 1,
+    dy = 0;
   if (vectorInfo) {
-    const magnitude = Math.sqrt(vectorInfo.dx * vectorInfo.dx + vectorInfo.dy * vectorInfo.dy);
+    const magnitude = Math.sqrt(
+      vectorInfo.dx * vectorInfo.dx + vectorInfo.dy * vectorInfo.dy,
+    );
     if (magnitude > 0) {
       dx = vectorInfo.dx / magnitude;
       dy = vectorInfo.dy / magnitude;
@@ -448,13 +467,13 @@ export function IDEFZM(
 
   // Position circle along the line direction, away from table
   const circleOffset = 8;
-  const circleX = cardinalityEndX - (dx * circleOffset);
-  const circleY = cardinalityEndY - (dy * circleOffset);
+  const circleX = cardinalityEndX - dx * circleOffset;
+  const circleY = cardinalityEndY - dy * circleOffset;
 
   // Position letter further away from table
   const letterOffset = 15;
-  const letterX = cardinalityEndX - (dx * letterOffset);
-  const letterY = cardinalityEndY - (dy * letterOffset) + 4; // Small adjustment for text baseline
+  const letterX = cardinalityEndX - dx * letterOffset;
+  const letterY = cardinalityEndY - dy * letterOffset + 4; // Small adjustment for text baseline
 
   return (
     pathRef && (
