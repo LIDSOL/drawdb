@@ -222,6 +222,13 @@ export default function Canvas() {
     newName: "",
   });
 
+  const [changeCardinalityModal, setChangeCardinalityModal] = useState({
+    visible: false,
+    relationshipId: null,
+    currentCardinality: "",
+    newCardinality: "",
+  });
+
   const [areaRenameModal, setAreaRenameModal] = useState({
     visible: false,
     areaId: null,
@@ -255,6 +262,7 @@ export default function Canvas() {
   const fieldRenameInputRef = useRef(null);
   const tableRenameInputRef = useRef(null);
   const relationshipRenameInputRef = useRef(null);
+  const changeCardinalityInputRef = useRef(null);
 
   // Auto-select text when field rename modal opens
   useEffect(() => {
@@ -294,6 +302,19 @@ export default function Canvas() {
       return () => clearTimeout(timer);
     }
   }, [relationshipRenameModal.visible]);
+
+  // Auto select when the change cardinality modal opens
+  useEffect(() => {
+    if (changeCardinalityModal.visible && changeCardinalityInputRef.current) {
+      const timer = setTimeout(() => {
+        if (changeCardinalityInputRef.current) {
+          changeCardinalityInputRef.current.focus();
+          changeCardinalityInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [changeCardinalityModal.visible]);
 
   // Centralized function to close all context menus
   const closeAllContextMenus = () => {
@@ -474,6 +495,45 @@ export default function Canvas() {
       relationshipId: null,
       currentName: "",
       newName: "",
+    });
+  };
+
+  const handleChangeCardinalityConfirm = () => {
+    const { relationshipId, newCardinality } = changeCardinalityModal;
+    const relationship = relationships.find((r) => r.id === relationshipId);
+
+    if (!relationship) return;
+
+    const trimmedCardinality = newCardinality.trim();
+    if (trimmedCardinality === "") {
+      handleChangeCardinalityCancel();
+      return;
+    }
+
+    const validation = validateCustomCardinality(trimmedCardinality);
+    if (!validation.valid) {
+      Toast.error(validation.message);
+      return;
+    }
+
+    updateRelationship(relationshipId, { cardinality: trimmedCardinality });
+
+    setChangeCardinalityModal({
+      visible: false,
+      relationshipId: null,
+      currentCardinality: "",
+      newCardinality: "",
+    });
+
+    Toast.success("Cardinality updated.");
+  };
+
+  const handleChangeCardinalityCancel = () => {
+    setChangeCardinalityModal({
+      visible: false,
+      relationshipId: null,
+      currentCardinality: "",
+      newCardinality: "",
     });
   };
 
@@ -729,6 +789,7 @@ export default function Canvas() {
 
   const handleRenameRelationship = () => {
     if (relationshipContextMenu.relationshipId !== null) {
+      // Find relationship by id
       const relationship = relationships.find(
         (r) => r.id === relationshipContextMenu.relationshipId,
       );
@@ -942,24 +1003,37 @@ export default function Canvas() {
     if (relationshipContextMenu.relationshipId !== null) {
       const relationship =
         relationships[relationshipContextMenu.relationshipId];
-      if (relationship) {
-        pushUndo({
-          action: Action.EDIT,
-          element: ObjectType.RELATIONSHIP,
-          rid: relationshipContextMenu.relationshipId,
-          undo: { cardinality: relationship.cardinality },
-          redo: { cardinality: newCardinality },
-          message: `Change cardinality for ${relationship.name}`,
+      if (!relationship) {
+        handleRelationshipContextMenuClose();
+        return;
+      }
+
+      if (newCardinality === "Custom...") {
+        setChangeCardinalityModal({
+          visible: true,
+          relationshipId: relationshipContextMenu.relationshipId,
+          currentCardinality: relationship.cardinality || "",
+          newCardinality: relationship.cardinality || "",
         });
-        setRelationships((prev) =>
-          prev.map((e, idx) =>
-            idx === relationshipContextMenu.relationshipId
-              ? { ...e, cardinality: newCardinality }
-              : e,
-          ),
-        );
+      } else {
+        updateRelationship(relationshipContextMenu.relationshipId, {
+          cardinality: newCardinality,
+        });
       }
       handleRelationshipContextMenuClose();
+    }
+  };
+
+  const validateCustomCardinality = (cardinality) => {
+    const regex = /^\((0|1),(n|\*|\d+)\)$/;
+
+    if (regex.test(cardinality)) {
+      return { valid: true };
+    } else {
+      return {
+        valid: false,
+        message: "Invalid format. Use (0,n), (1,*), or (0,10).",
+      };
     }
   };
 
@@ -1033,7 +1107,6 @@ export default function Canvas() {
     }
   };
 
-  // Area context menu handlers
   const handleAreaContextMenu = (e, areaId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1155,7 +1228,6 @@ export default function Canvas() {
     }
   };
 
-  // Note context menu handlers
   const handleNoteContextMenu = (e, noteId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1376,12 +1448,9 @@ export default function Canvas() {
     relatedTableId,
     relatedFieldId,
   ) => {
-    // Rename the original field
     renameFieldOnly(tableId, fieldId, newName);
-    // Rename the related field
     renameFieldOnly(relatedTableId, relatedFieldId, newName);
 
-    // Update relationship names to default when foreign key fields are renamed
     updateRelationshipNamesAfterFieldRename(
       tableId,
       fieldId,
@@ -3258,6 +3327,51 @@ export default function Canvas() {
             placeholder={t("name")}
             onEnterPress={handleRelationshipRenameConfirm}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("change") + " Cardinality"}
+        visible={changeCardinalityModal.visible}
+        onOk={handleChangeCardinalityConfirm}
+        onCancel={handleChangeCardinalityCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            Cardinality:
+          </label>
+          <Input
+            ref={changeCardinalityInputRef}
+            value={changeCardinalityModal.newCardinality}
+            onChange={(value) =>
+              setChangeCardinalityModal((prev) => ({
+                ...prev,
+                newCardinality: value,
+              }))
+            }
+            placeholder={"e.g., (1,n)"}
+            onEnterPress={handleChangeCardinalityConfirm}
+          />
+
+          {/* ADD THIS SECTION FOR THE LEGEND */}
+          <div
+            style={{
+              marginTop: "10px",
+              fontSize: "12px",
+              color: "#a0a0a0",
+              lineHeight: "1.5",
+            }}
+          >
+            <p>Format: (x,y) where x is 0 or 1, and y is n, *, or a number.</p>
+          </div>
         </div>
       </Modal>
 
