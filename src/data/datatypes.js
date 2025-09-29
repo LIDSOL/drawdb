@@ -7,16 +7,6 @@ const binaryRegex = /^[01]+$/;
 
 /* eslint-disable no-unused-vars */
 const defaultTypesBase = {
-  NUMBER: {
-    type: "NUMBER",
-    checkDefault: (field) => {
-      return intRegex.test(field.default);
-    },
-    hasCheck: true,
-    isSized: false,
-    hasPrecision: true,
-    canIncrement: true,
-  },
   INT: {
     type: "INT",
     checkDefault: (field) => {
@@ -314,19 +304,6 @@ const defaultTypesBase = {
     isSized: false,
     hasPrecision: false,
     noDefault: true,
-  },
-  VARCHAR2: {
-    type: "VARCHAR2",
-    checkDefault: (field) => {
-      if (strHasQuotes(field.default)) {
-        return field.default.length - 2 <= field.size;
-      }
-      return field.default.length <= field.size;
-    },
-    hasCheck: true,
-    isSized: true,
-    hasPrecision: false,
-    defaultSize: 10,
   },
 };
 

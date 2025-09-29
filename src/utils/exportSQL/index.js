@@ -5,7 +5,6 @@ import { toMySQL } from "./mysql";
 import { toOracleSQL } from "./oraclesql";
 import { toPostgres } from "./postgres";
 import { toSqlite } from "./sqlite";
-import { toOracle } from "./oracle";
 
 export function exportSQL(diagram) {
   switch (diagram.database) {

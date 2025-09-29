@@ -138,18 +138,63 @@ export default function Modal({
   const parseSQLAndLoadDiagram = () => {
     const targetDatabase = database === DB.GENERIC ? importDb : database;
 
+    // Preprocess SQL for Oracle parser
+    const preprocessOracleSQL = (sql) => {
+      return sql
+        // Remove comments that start with --@ which can cause parsing issues
+        .replace(/--@[^\r\n]*/g, '')
+        // Remove standalone comment lines that just contain --
+        .replace(/^\s*--\s*$/gm, '')
+        // Remove table comment blocks like -- TABLE: TABLENAME --
+        .replace(/--\s*TABLE:\s*[^-]*--/g, '')
+        // Clean up multiple empty lines
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        // Ensure statements end with semicolons
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.match(/^--\s*$/))
+        .join('\n');
+    };
+
     let ast = null;
     try {
       if (targetDatabase === DB.ORACLESQL) {
-        const oracleParser = new OracleParser();
-
-        ast = oracleParser.parse(importSource.src);
+        // Try Oracle parser first
+        try {
+          const oracleParser = new OracleParser();
+          const preprocessedSQL = preprocessOracleSQL(importSource.src);
+          console.log("Preprocessed SQL:", preprocessedSQL);
+          ast = oracleParser.parse(preprocessedSQL);
+          console.log("Oracle parser AST:", ast);
+        } catch (oracleError) {
+          console.warn("Oracle parser failed, trying standard parser:", oracleError);
+          // Fallback to standard parser with modified SQL
+          try {
+            const parser = new Parser();
+            // Try to convert Oracle-specific syntax to MySQL-compatible
+            const mysqlCompatibleSQL = importSource.src
+              .replace(/NUMBER\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/gi, 'DECIMAL($1,$2)')
+              .replace(/NUMBER\s*\(\s*(\d+)\s*\)/gi, 'INT($1)')
+              .replace(/NUMBER(?!\s*\()/gi, 'INT')
+              .replace(/VARCHAR2/gi, 'VARCHAR')
+              .replace(/--@[^\r\n]*/g, '');
+            
+            ast = parser.astify(mysqlCompatibleSQL, {
+              database: "mysql",
+            });
+            console.log("Standard parser AST with MySQL compatibility:", ast);
+          } catch (standardError) {
+            console.error("Both parsers failed:", standardError);
+            throw new Error(`Failed to parse SQL. Oracle parser error: ${oracleError.message}. Standard parser error: ${standardError.message}`);
+          }
+        }
       } else {
         const parser = new Parser();
 
         ast = parser.astify(importSource.src, {
           database: targetDatabase,
         });
+        console.log("Standard parser AST:", ast);
       }
     } catch (error) {
       const message = error.location
@@ -161,6 +206,13 @@ export default function Modal({
     }
 
     try {
+      console.log("About to import SQL with AST:", ast);
+      console.log("Target database:", database === DB.GENERIC ? importDb : database);
+      console.log("Current database:", database);
+      if (!ast) {
+        throw new Error("AST is null or undefined");
+      }
+
       const diagramData = importSQL(
         ast,
         database === DB.GENERIC ? importDb : database,
@@ -190,10 +242,11 @@ export default function Modal({
       }
 
       setModal(MODAL.NONE);
-    } catch {
+    } catch (importError) {
+      console.error("Import error:", importError);
       setError({
         type: STATUS.ERROR,
-        message: `Please check for syntax errors or let us know about the error.`,
+        message: `Import failed: ${importError.message || "Please check for syntax errors or let us know about the error."}`,
       });
     }
   };

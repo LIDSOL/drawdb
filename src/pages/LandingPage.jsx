@@ -16,7 +16,6 @@ import screenshot from "../assets/screenshot.png";
 import FadeIn from "../animations/FadeIn";
 import axios from "axios";
 import { languages } from "../i18n/i18n";
-import { Tweet } from "react-tweet";
 import { socials } from "../data/socials";
 
 function shortenNumber(number) {
