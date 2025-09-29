@@ -130,7 +130,7 @@ export default function Modal({
         }
       })
       .catch((error) => {
-        console.log(error);
+        console.error(error);
         Toast.error(t("didnt_find_diagram"));
       });
   };
@@ -163,9 +163,7 @@ export default function Modal({
         try {
           const oracleParser = new OracleParser();
           const preprocessedSQL = preprocessOracleSQL(importSource.src);
-          console.log("Preprocessed SQL:", preprocessedSQL);
           ast = oracleParser.parse(preprocessedSQL);
-          console.log("Oracle parser AST:", ast);
         } catch (oracleError) {
           console.warn("Oracle parser failed, trying standard parser:", oracleError);
           // Fallback to standard parser with modified SQL
@@ -182,7 +180,6 @@ export default function Modal({
             ast = parser.astify(mysqlCompatibleSQL, {
               database: "mysql",
             });
-            console.log("Standard parser AST with MySQL compatibility:", ast);
           } catch (standardError) {
             console.error("Both parsers failed:", standardError);
             throw new Error(`Failed to parse SQL. Oracle parser error: ${oracleError.message}. Standard parser error: ${standardError.message}`);
@@ -194,7 +191,6 @@ export default function Modal({
         ast = parser.astify(importSource.src, {
           database: targetDatabase,
         });
-        console.log("Standard parser AST:", ast);
       }
     } catch (error) {
       const message = error.location
@@ -206,9 +202,6 @@ export default function Modal({
     }
 
     try {
-      console.log("About to import SQL with AST:", ast);
-      console.log("Target database:", database === DB.GENERIC ? importDb : database);
-      console.log("Current database:", database);
       if (!ast) {
         throw new Error("AST is null or undefined");
       }

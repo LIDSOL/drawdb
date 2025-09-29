@@ -24,7 +24,6 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
   const enums = [];
 
   const parseSingleStatement = (e) => {
-    console.log("Parsing statement:", e);
     // Handle Oracle parser format
     if (e.operation === "create" && e.object === "table") {
       const table = {};
@@ -156,19 +155,13 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
         table.fields.push(field);
       } else if (d.resource === "constraint") {
         // Handle table-level constraints
-        console.log("Processing table constraint:", d);
-        console.log("Constraint type:", d.constraint_type);
-        console.log("Full constraint object:", JSON.stringify(d, null, 2));
         if (d.constraint_type === "primary key") {
-          console.log("Found PRIMARY KEY constraint:", d.definition);
           if (d.definition && Array.isArray(d.definition)) {
             d.definition.forEach(colRef => {
               const columnName = colRef.column;
-              console.log("Setting primary key for column:", columnName);
               const field = table.fields.find(f => f.name === columnName);
               if (field) {
                 field.primary = true;
-                console.log("Successfully set primary key for field:", field.name);
               } else {
                 console.warn("Could not find field for primary key:", columnName);
               }
@@ -177,14 +170,10 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
         }
         if (d.constraint_type === "FOREIGN KEY" || d.constraint_type === "foreign key") {
           // Handle foreign key constraints
-          console.log("Found FOREIGN KEY constraint:", d);
-          console.log("Definition:", d.definition);
-          console.log("Reference definition:", d.reference_definition);
           // Extract foreign key information
           const sourceColumn = d.definition[0]?.column;
           const targetTable = d.reference_definition?.table[0]?.table;
           const targetColumn = d.reference_definition?.definition[0]?.column;
-          console.log(`Creating foreign key: ${sourceColumn} -> ${targetTable}.${targetColumn}`);
           // Store foreign key for later processing
           if (!table.foreignKeys) table.foreignKeys = [];
           table.foreignKeys.push({
@@ -203,18 +192,13 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
   };
 
   const parseConstraint = (table, d) => {
-    console.log("Processing constraint:", d);
-    console.log("Constraint details:", d.constraint);
     // Handle PRIMARY KEY constraints
     if (d.constraint.primary_key) {
-      console.log("Found PRIMARY KEY constraint:", d.constraint);
       if (d.constraint.columns && Array.isArray(d.constraint.columns)) {
         d.constraint.columns.forEach(columnName => {
-          console.log("Setting primary key for column:", columnName);
           const field = table.fields.find(f => f.name === columnName);
           if (field) {
             field.primary = true;
-            console.log("Successfully set primary key for field:", field.name);
           } else {
             console.warn("Could not find field for primary key:", columnName);
           }
@@ -270,23 +254,14 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
   ast.forEach((e) => parseSingleStatement(e));
 
   // Process stored foreign keys after all tables are created
-  console.log("Processing stored foreign keys...");
-  tables.forEach((table, tableIndex) => {
-    console.log(`Checking table ${table.name} (index ${tableIndex}) for foreign keys...`);
+  tables.forEach((table) => {
     if (table.foreignKeys && table.foreignKeys.length > 0) {
-      console.log(`Found ${table.foreignKeys.length} foreign keys in table ${table.name}`);
-      table.foreignKeys.forEach((fk, fkIndex) => {
-        console.log(`Processing foreign key ${fkIndex + 1}:`, JSON.stringify(fk, null, 2));
+      table.foreignKeys.forEach((fk) => {
         const relationship = {};
-        // En una relación FK: 
-        // - La tabla que contiene la PK es el START (tabla padre)
-        // - La tabla que contiene la FK es el END (tabla hija)
-        const foreignKeyField = fk.sourceColumn;  // Campo FK en tabla actual
-        const primaryKeyTable = fk.targetTable;  // Tabla que contiene la PK
-        const primaryKeyField = fk.targetColumn; // Campo PK en tabla referenciada
-        console.log(`Creating relationship: ${primaryKeyTable}.${primaryKeyField} -> ${table.name}.${foreignKeyField}`);
-        
-        // La tabla que contiene la Primary Key es el START
+        const foreignKeyField = fk.sourceColumn;
+        const primaryKeyTable = fk.targetTable;
+        const primaryKeyField = fk.targetColumn;        
+        // The table that contains the Primary Key is the START
         const startTableId = tables.findIndex((t) => t.name === primaryKeyTable);
         if (startTableId === -1) {
           console.warn("Could not find referenced table:", primaryKeyTable);
@@ -311,20 +286,17 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
         }
 
         relationship.id = relationships.length;
-        relationship.startTableId = startTableId;   // Tabla con PK
-        relationship.startFieldId = startFieldId;   // Campo PK
-        relationship.endTableId = table.id;         // Tabla con FK  
-        relationship.endFieldId = endFieldId;       // Campo FK
+        relationship.startTableId = startTableId;   // Table with PK
+        relationship.startFieldId = startFieldId;   // PK field
+        relationship.endTableId = table.id;         // Table with FK
+        relationship.endFieldId = endFieldId;       // FK field
         relationship.updateConstraint = Constraint.NONE;
         relationship.name = fk.constraintName ||
           "fk_" + primaryKeyTable + "_" + primaryKeyField + "_" + table.name;
         relationship.deleteConstraint = Constraint.NONE;
 
-        console.log("Created relationship:", relationship);
         relationships.push(relationship);
       });
-    } else {
-      console.log(`No foreign keys found in table ${table.name}`);
     }
   });
 
