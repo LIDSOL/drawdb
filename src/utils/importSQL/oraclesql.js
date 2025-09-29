@@ -278,40 +278,46 @@ export function fromOracleSQL(ast, diagramDb = DB.GENERIC) {
       table.foreignKeys.forEach((fk, fkIndex) => {
         console.log(`Processing foreign key ${fkIndex + 1}:`, JSON.stringify(fk, null, 2));
         const relationship = {};
-        const startField = fk.sourceColumn;
-        const endTable = fk.targetTable;
-        const endField = fk.targetColumn;
-        console.log(`Creating relationship: ${table.name}.${startField} -> ${endTable}.${endField}`);
-        const endTableId = tables.findIndex((t) => t.name === endTable);
-        if (endTableId === -1) {
-          console.warn("Could not find referenced table:", endTable);
+        // En una relación FK: 
+        // - La tabla que contiene la PK es el START (tabla padre)
+        // - La tabla que contiene la FK es el END (tabla hija)
+        const foreignKeyField = fk.sourceColumn;  // Campo FK en tabla actual
+        const primaryKeyTable = fk.targetTable;  // Tabla que contiene la PK
+        const primaryKeyField = fk.targetColumn; // Campo PK en tabla referenciada
+        console.log(`Creating relationship: ${primaryKeyTable}.${primaryKeyField} -> ${table.name}.${foreignKeyField}`);
+        
+        // La tabla que contiene la Primary Key es el START
+        const startTableId = tables.findIndex((t) => t.name === primaryKeyTable);
+        if (startTableId === -1) {
+          console.warn("Could not find referenced table:", primaryKeyTable);
           return;
         }
 
-        const endFieldId = tables[endTableId].fields.findIndex(
-          (f) => f.name === endField,
-        );
-        if (endFieldId === -1) {
-          console.warn("Could not find referenced field:", endField);
-          return;
-        }
-
-        const startFieldId = table.fields.findIndex(
-          (f) => f.name === startField,
+        const startFieldId = tables[startTableId].fields.findIndex(
+          (f) => f.name === primaryKeyField,
         );
         if (startFieldId === -1) {
-          console.warn("Could not find source field:", startField);
+          console.warn("Could not find referenced field:", primaryKeyField);
+          return;
+        }
+
+        // La tabla que contiene la Foreign Key es el END
+        const endFieldId = table.fields.findIndex(
+          (f) => f.name === foreignKeyField,
+        );
+        if (endFieldId === -1) {
+          console.warn("Could not find source field:", foreignKeyField);
           return;
         }
 
         relationship.id = relationships.length;
-        relationship.startTableId = table.id;
-        relationship.startFieldId = startFieldId;
-        relationship.endTableId = endTableId;
-        relationship.endFieldId = endFieldId;
+        relationship.startTableId = startTableId;   // Tabla con PK
+        relationship.startFieldId = startFieldId;   // Campo PK
+        relationship.endTableId = table.id;         // Tabla con FK  
+        relationship.endFieldId = endFieldId;       // Campo FK
         relationship.updateConstraint = Constraint.NONE;
         relationship.name = fk.constraintName ||
-          "fk_" + table.name + "_" + startField + "_" + endTable;
+          "fk_" + primaryKeyTable + "_" + primaryKeyField + "_" + table.name;
         relationship.deleteConstraint = Constraint.NONE;
 
         console.log("Created relationship:", relationship);
