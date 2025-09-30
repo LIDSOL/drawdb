@@ -85,6 +85,60 @@ export default function RelationshipInfo({ data }) {
       return;
     }
     const effectiveEndTable = getEffectiveEndTable();
+    const currentChildTableId = effectiveEndTable.tableId;
+    const currentParentTableId = data.startTableId;
+    // Find current child and parent tables
+    const currentChildTable = tables.find(t => t.id === currentChildTableId);
+    const currentParentTable = tables.find(t => t.id === currentParentTableId);
+    if (!currentChildTable || !currentParentTable) {
+      console.error("Cannot find child or parent table for swap operation");
+      return;
+    }
+
+    // Step 1: Find and collect FK fields in current child table that reference the current parent
+    const currentFkFields = currentChildTable.fields.filter(field =>
+      field.foreignK &&
+      field.foreignKey &&
+      field.foreignKey.tableId === currentParentTableId
+    );
+
+    // Step 2: Prepare new FK fields for the new child table (current parent)
+    const newChildTable = currentParentTable;
+    const newParentTable = currentChildTable;
+    const newParentPkFields = newParentTable.fields.filter(field => field.primary);
+    if (newParentPkFields.length === 0) {
+      Toast.error("Cannot swap: New parent table has no primary key fields");
+      return;
+    }
+
+    // Find the primary key field that will be referenced by the new FK
+    const newParentPkField = newParentTable.fields.find(field => field.primary);
+    const newParentPkFieldId = newParentPkField ? newParentPkField.id : 0;
+
+    // Generate new FK fields for the new child table
+    const newFkFields = newParentPkFields.map((pkField, index) => ({
+      name: `${pkField.name}`,
+      type: pkField.type,
+      size: pkField.size,
+      notNull: true,
+      unique: false,
+      default: "",
+      check: "",
+      primary: false,
+      increment: false,
+      comment: `Foreign key referencing ${newParentTable.name}.${pkField.name}`,
+      foreignK: true,
+      foreignKey: {
+        tableId: newParentTable.id,
+        fieldId: pkField.id,
+      },
+      id: newChildTable.fields.reduce((maxId, f) => Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index,
+    }));
+
+    // Store states for undo
+    const undoChildTableFields = JSON.parse(JSON.stringify(currentChildTable.fields));
+    const undoParentTableFields = JSON.parse(JSON.stringify(currentParentTable.fields));
+
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
@@ -94,32 +148,68 @@ export default function RelationshipInfo({ data }) {
         startFieldId: data.startFieldId,
         endTableId: effectiveEndTable.tableId,
         endFieldId: effectiveEndTable.fieldId,
+        // Store table states for FK restoration
+        childTableFields: undoChildTableFields,
+        parentTableFields: undoParentTableFields,
+        childTableId: currentChildTableId,
+        parentTableId: currentParentTableId,
+        removedFkFields: currentFkFields,
+        addedFkFields: newFkFields,
       },
       redo: {
         startTableId: effectiveEndTable.tableId,
-        startFieldId: effectiveEndTable.fieldId,
+        startFieldId: newParentPkFieldId, // Use the correct PK field ID
         endTableId: data.startTableId,
-        endFieldId: data.startFieldId,
+        endFieldId: newFkFields.length > 0 ? newFkFields[0].id : data.startFieldId,
+        // Store table states for FK restoration
+        childTableFields: undoParentTableFields,
+        parentTableFields: undoChildTableFields,
+        childTableId: currentParentTableId,
+        parentTableId: currentChildTableId,
+        removedFkFields: currentFkFields,
+        addedFkFields: newFkFields,
       },
       message: t("edit_relationship", {
         refName: data.name,
         extra: "[swap keys]",
       }),
     });
+
+    // Step 3: Remove FK fields from current child table
+    const updatedCurrentChildFields = currentChildTable.fields.filter(field =>
+      !(field.foreignK &&
+        field.foreignKey &&
+        field.foreignKey.tableId === currentParentTableId)
+    ).map((f, i) => ({ ...f, id: i }));
+
+    // Step 4: Add FK fields to new child table (current parent)
+    const updatedNewChildFields = [...newChildTable.fields, ...newFkFields];
+
+    // Step 5: Update both tables
+    setTables((prevTables) =>
+      prevTables.map((table) => {
+        if (table.id === currentChildTableId) {
+          return { ...table, fields: updatedCurrentChildFields };
+        } else if (table.id === currentParentTableId) {
+          return { ...table, fields: updatedNewChildFields };
+        }
+        return table;
+      })
+    );
+
+    // Step 6: Update relationship with swapped roles
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id
           ? {
               ...e,
-              name: `fk_${tables[effectiveEndTable.tableId].name}_${
-                tables[effectiveEndTable.tableId].fields[
-                  effectiveEndTable.fieldId
-                ].name
-              }_${tables[e.startTableId].name}`,
-              startTableId: effectiveEndTable.tableId,
-              startFieldId: effectiveEndTable.fieldId,
-              endTableId: e.startTableId,
-              endFieldId: e.startFieldId,
+              name: `fk_${newChildTable.name}_${
+                newFkFields.length > 0 ? newFkFields[0].name : 'field'
+              }_${newParentTable.name}`,
+              startTableId: currentChildTableId, // New parent (was child)
+              startFieldId: newParentPkFieldId, // New parent PK field
+              endTableId: currentParentTableId, // New child (was parent)
+              endFieldId: newFkFields.length > 0 ? newFkFields[0].id : 0, // New FK field
               // Clear multi-child arrays when swapping back to single format
               endTableIds: undefined,
               endFieldIds: undefined,
@@ -127,6 +217,7 @@ export default function RelationshipInfo({ data }) {
           : e,
       ),
     );
+    Toast.success("Relationship swapped successfully with FK fields updated");
   };
 
   const changeRelationshipType = (value) => {
