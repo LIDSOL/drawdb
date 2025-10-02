@@ -7,10 +7,11 @@ const Analytics = () => {
   useEffect(() => {
     if (window.gtag) {
       const isDev = import.meta.env.DEV;
-      window.gtag("config", "G-JMYXZ0DKNV", {
-        page_path: location.pathname + location.search,
-        traffic_type: isDev ? "development" : "production",
-      });
+      if (isDev === false) {
+        window.gtag("config", "G-JMYXZ0DKNV", {
+          page_path: location.pathname + location.search,
+        });
+      }
     }
   }, [location]);
 
