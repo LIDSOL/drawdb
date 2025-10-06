@@ -354,8 +354,28 @@ export default function ControlPanel({
             }
             // Restore the relationships that were deleted.
             if (a.data.deletedRelationships && Array.isArray(a.data.deletedRelationships)) {
-              a.data.deletedRelationships.forEach(rel => {
-                addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+              a.data.deletedRelationships.forEach((rel) => {
+                try {
+                  const relToCompare = { ...rel };
+                  // remove id for comparison
+                  delete relToCompare.id;
+                  // create a canonical string for comparison (stable ordering)
+                  const relKey = JSON.stringify(relToCompare, Object.keys(relToCompare).sort());
+
+                  const alreadyExists = relationships.some((existing) => {
+                    const e = { ...existing };
+                    delete e.id;
+                    const existingKey = JSON.stringify(e, Object.keys(e).sort());
+                    return existingKey === relKey;
+                  });
+
+                  if (!alreadyExists) {
+                    addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+                  }
+                } catch (e) {
+                  // Fallback to naive add on any error to avoid losing data
+                  addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+                }
               });
             }
             // Restore the relationships that were modified (their fieldId) to their original state.
@@ -588,10 +608,13 @@ export default function ControlPanel({
           // Redoing a field_delete means calling deleteField again.
           // a.data should contain { field, deletedRelationships, modifiedRelationshipsOriginalState, previousFields, childFieldsSnapshot }
           // The 'previousFields' in a.data is the state *before* the original deletion, which is what the *next* undo needs.
-          if (a.data && a.data.field && typeof a.data.tid !== 'undefined') {
-            actionForUndoStack.data = JSON.parse(JSON.stringify(a.data));
+          // Note: older entries may store tid at the root (a.tid) instead of inside a.data — prefer a.data.tid but fall back to a.tid.
+          const tidForDelete = a.data && typeof a.data.tid !== 'undefined' ? a.data.tid : a.tid;
+          if (a.data && a.data.field && typeof tidForDelete !== 'undefined') {
+            // Ensure the undo entry created by this redo has consistent data shape (include tid inside data)
+            actionForUndoStack.data = { ...(JSON.parse(JSON.stringify(a.data)) || {}), tid: tidForDelete };
 
-            deleteField(a.data.field, a.data.tid, false);
+            deleteField(a.data.field, tidForDelete, false);
           }
         } else if (a.component === "field_add") {
           if (tableBeforeRedo && a.data && a.data.fieldThatWasAdded) {
