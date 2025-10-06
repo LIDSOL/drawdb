@@ -259,6 +259,8 @@ const es = {
     readme: "README",
     Null_not_allowed:
       "No se permite una fk nula para relaciones identificativas",
+    No_primary_key_in_table: "No se puede intercambiar: no existe clave primaria",
+    Swap_successful: "Relación intercambiada con éxito",
   },
 };
 

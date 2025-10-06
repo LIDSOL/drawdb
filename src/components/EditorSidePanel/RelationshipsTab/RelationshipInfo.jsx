@@ -107,7 +107,7 @@ export default function RelationshipInfo({ data }) {
     const newParentTable = currentChildTable;
     const newParentPkFields = newParentTable.fields.filter(field => field.primary);
     if (newParentPkFields.length === 0) {
-      Toast.error("Cannot swap: New parent table has no primary key fields");
+      Toast.error(t("No_primary_key_in_table"));
       return;
     }
 
@@ -217,7 +217,7 @@ export default function RelationshipInfo({ data }) {
           : e,
       ),
     );
-    Toast.success("Relationship swapped successfully with FK fields updated");
+    Toast.success(t("Swap_successful"));
   };
 
   const changeRelationshipType = (value) => {
