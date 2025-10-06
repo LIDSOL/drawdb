@@ -95,14 +95,14 @@ export default function RelationshipInfo({ data }) {
       return;
     }
 
-    // Step 1: Find and collect FK fields in current child table that reference the current parent
+    // Find and collect FK fields in current child table that reference the current parent
     const currentFkFields = currentChildTable.fields.filter(field =>
       field.foreignK &&
       field.foreignKey &&
       field.foreignKey.tableId === currentParentTableId
     );
 
-    // Step 2: Prepare new FK fields for the new child table (current parent)
+    // Prepare new FK fields for the new child table (current parent)
     const newChildTable = currentParentTable;
     const newParentTable = currentChildTable;
     const newParentPkFields = newParentTable.fields.filter(field => field.primary);
@@ -175,17 +175,17 @@ export default function RelationshipInfo({ data }) {
       }),
     });
 
-    // Step 3: Remove FK fields from current child table
+    // Remove FK fields from current child table
     const updatedCurrentChildFields = currentChildTable.fields.filter(field =>
       !(field.foreignK &&
         field.foreignKey &&
         field.foreignKey.tableId === currentParentTableId)
     ).map((f, i) => ({ ...f, id: i }));
 
-    // Step 4: Add FK fields to new child table (current parent)
+    // Add FK fields to new child table (current parent)
     const updatedNewChildFields = [...newChildTable.fields, ...newFkFields];
 
-    // Step 5: Update both tables
+    // Update both tables
     setTables((prevTables) =>
       prevTables.map((table) => {
         if (table.id === currentChildTableId) {
@@ -197,7 +197,7 @@ export default function RelationshipInfo({ data }) {
       })
     );
 
-    // Step 6: Update relationship with swapped roles
+    // Update relationship with swapped roles
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id
