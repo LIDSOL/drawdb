@@ -1,8 +1,8 @@
 /* eslint-env jest */
-import { toOracle } from "../src/utils/exportSQL/oracle.js";
+import { toOracleSQL } from "../src/utils/exportSQL/oraclesql.js";
 import { DB } from "../src/data/constants.js";
 
-describe("toOracle", () => {
+describe("toOracleSQL", () => {
   test("test for unique index creation", () => {
     const diagram = {
       database: DB.ORACLE,
@@ -39,16 +39,16 @@ describe("toOracle", () => {
     };
 
     const expectedSQL = `CREATE TABLE mochila (
-\t"mochila_id" NUMBER(10,0) NOT NULL,
-\t"capacidad_kg" NUMBER(2,0) NOT NULL,
-\tCONSTRAINT mochila_pk PRIMARY KEY("mochila_id")
+\tmochila_id NUMBER(10,0) NOT NULL,
+\tcapacidad_kg NUMBER(2,0) NOT NULL,
+\tCONSTRAINT mochila_pk PRIMARY KEY(mochila_id)
 );
 
 
-CREATE UNIQUE INDEX "mochila_index_0" ON mochila ("mochila_id");
-`;   
+CREATE UNIQUE INDEX mochila_index_0 ON mochila (mochila_id);
+`;
 
-    const result = toOracle(diagram);
+    const result = toOracleSQL(diagram);
     expect(result.trim()).toBe(expectedSQL.trim());
   });
 });
