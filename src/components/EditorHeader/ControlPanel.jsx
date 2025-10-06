@@ -1522,17 +1522,20 @@ export default function ControlPanel({
       notation: {
         children: [
           {
-            default_notation: () => {
+            name: "Default",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.DEFAULT }));
             },
           },
           {
-            crows_foot_notation: () => {
+            name: "Crow's Foot",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.CROWS_FOOT }));
             },
           },
           {
-            idef1x_notation: () => {
+            name: "IDEF1X",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.IDEF1X }));
             },
           },
