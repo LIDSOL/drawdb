@@ -1025,16 +1025,44 @@ export default function Canvas() {
   };
 
   const validateCustomCardinality = (cardinality) => {
-    const regex = /^\((0|1),(n|\*|\d+)\)$/;
 
-    if (regex.test(cardinality)) {
-      return { valid: true };
-    } else {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) {
       return {
         valid: false,
-        message: "Invalid format. Use (0,n), (1,*), or (0,10).",
+        message: "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
       };
     }
+
+    const first = parseInt(match[1]);
+    const second = match[2];
+
+    // First coordinate must be 0 or 1
+    if (first !== 0 && first !== 1) {
+      return {
+        valid: false,
+        message: "First coordinate must be 0 or 1",
+      };
+    }
+
+    // Second coordinate must be * or a number greater than 1
+    if (second !== "*") {
+      if (/^0\d+$/.test(second)) {
+        return {
+          valid: false,
+          message: "Second coordinate must not have leading zeros.",
+        };
+      }
+      const secondNum = parseInt(second);
+      if (isNaN(secondNum) || secondNum < 2) {
+        return {
+          valid: false,
+          message: "Second coordinate must be greater than 1 or *",
+        };
+      }
+    }
+
+    return { valid: true };
   };
 
   const handleDeleteRelationship = () => {

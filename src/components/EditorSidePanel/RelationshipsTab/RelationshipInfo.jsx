@@ -296,6 +296,15 @@ export default function RelationshipInfo({ data }) {
 
     // Second coordinate must be * or a number greater than 1
     if (second !== "*") {
+      if (/^0\d+$/.test(second)) {
+        return {
+          valid: false,
+          message: t(
+            "cardinality_second_leading_zero_error",
+            "Second coordinate must not have leading zeros.",
+          ),
+        };
+      }
       const secondNum = parseInt(second);
       if (isNaN(secondNum) || secondNum < 2) {
         return {

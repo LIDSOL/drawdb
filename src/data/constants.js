@@ -37,19 +37,19 @@ export const RelationshipType = {
 
 export const RelationshipCardinalities = {
   [RelationshipType.ONE_TO_ONE]: [
-    { value: "0,1", label: "(0,1)" },
-    { value: "1,1", label: "(1,1)" },
+    {value: "0,1", label: "(0,1)"},
+    {value: "1,1", label: "(1,1)"},
   ],
   [RelationshipType.ONE_TO_MANY]: [
-    { value: "0,*", label: "(0,*)" },
-    { value: "1,*", label: "(1,*)" },
-    { value: "custom", label: "Custom..." },
+    {value: "0,*", label: "(0,*)"},
+    {value: "1,*", label: "(1,*)"},
+    {value: "custom", label: "Custom..."},
   ],
 };
 
 export const ParentCardinality = {
-  DEFAULT: { value: "1,1", label: "(1,1)" },
-  NULLEABLE: { value: "0,1", label: "(0,1)" },
+  DEFAULT: {value: "1,1", label: "(1,1)"},
+  NULLEABLE: {value: "0,1", label: "(0,1)"},
 };
 
 export const Notation = {
