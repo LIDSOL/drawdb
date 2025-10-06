@@ -353,10 +353,6 @@ export default function ControlPanel({
               });
             }
             // Restore the relationships that were deleted.
-            // Guard against re-adding the same relationship multiple times (duplicates observed
-            // when undo/redo sequences occur). We compare relationships by their significant
-            // properties (excluding the mutable `id`) and only add them when an equivalent
-            // relationship isn't already present.
             if (a.data.deletedRelationships && Array.isArray(a.data.deletedRelationships)) {
               a.data.deletedRelationships.forEach((rel) => {
                 try {
