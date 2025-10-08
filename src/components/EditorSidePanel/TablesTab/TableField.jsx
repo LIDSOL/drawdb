@@ -318,7 +318,10 @@ export default function TableField({ data, tid, index }) {
                       data.size && data.size.includes(",")
                         ? data.size.split(",")[1]?.trim() || "0"
                         : "0";
-                    const newSize = value ? `${value},${scale}` : "";
+                    const scaleNum = parseInt(scale) || 0;
+                    const maxAccuracy = Math.max(0, value - 1);
+                    const clampedScale = Math.min(scaleNum, maxAccuracy);
+                    const newSize = value ? `${value},${clampedScale}` : "";
                     updateField(tid, index, { size: newSize });
                   }}
                   onFocus={() => setEditField({ size: data.size })}
@@ -350,15 +353,22 @@ export default function TableField({ data, tid, index }) {
                   }
                   className="w-full"
                   min={0}
-                  max={30}
+                  max={
+                    data.size && data.size.includes(",")
+                      ? Math.max(0, parseInt(data.size.split(",")[0]) - 1)
+                      : 9
+                  }
                   onChange={(value) => {
                     const precision =
                       data.size && data.size.includes(",")
                         ? data.size.split(",")[0] || "10"
                         : "10";
+                    const precisionNum = parseInt(precision);
+                    const maxAccuracy = Math.max(0, precisionNum - 1);
+                    const clampedValue = Math.min(value || 0, maxAccuracy);
                     const newSize =
-                      typeof value === "number"
-                        ? `${precision},${value}`
+                      typeof clampedValue === "number"
+                        ? `${precision},${clampedValue}`
                         : precision;
                     updateField(tid, index, { size: newSize });
                   }}
