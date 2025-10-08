@@ -24,6 +24,7 @@ export default function FieldContextMenu({
   onToggleNotNull,
   onToggleUnique,
   onToggleAutoIncrement,
+  onEditProperties,
 }) {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -75,6 +76,14 @@ export default function FieldContextMenu({
       icon: <IconEdit2Stroked />,
       onClick: () => {
         onRename();
+        onClose();
+      },
+    },
+    {
+      label: "Edit Properties",
+      icon: <IconEdit />,
+      onClick: () => {
+        onEditProperties();
         onClose();
       },
     },
