@@ -321,8 +321,8 @@ export default function TableField({ data, tid, index }) {
                     const newSize = value ? `${value},${scale}` : "";
                     updateField(tid, index, { size: newSize });
                   }}
-                  onFocus={(e) => setEditField({ size: data.size })}
-                  onBlur={(e) => {
+                  onFocus={() => setEditField({ size: data.size })}
+                  onBlur={() => {
                     if (data.size === editField.size) return;
                     pushUndo({
                       action: Action.EDIT,
@@ -362,8 +362,8 @@ export default function TableField({ data, tid, index }) {
                         : precision;
                     updateField(tid, index, { size: newSize });
                   }}
-                  onFocus={(e) => setEditField({ size: data.size })}
-                  onBlur={(e) => {
+                  onFocus={() => setEditField({ size: data.size })}
+                  onBlur={() => {
                     if (data.size === editField.size) return;
                     pushUndo({
                       action: Action.EDIT,
