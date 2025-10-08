@@ -296,15 +296,6 @@ export default function RelationshipInfo({ data }) {
 
     // Second coordinate must be * or a number greater than 1
     if (second !== "*") {
-      if (/^0\d+$/.test(second)) {
-        return {
-          valid: false,
-          message: t(
-            "cardinality_second_leading_zero_error",
-            "Second coordinate must not have leading zeros.",
-          ),
-        };
-      }
       const secondNum = parseInt(second);
       if (isNaN(secondNum) || secondNum < 2) {
         return {
@@ -320,6 +311,16 @@ export default function RelationshipInfo({ data }) {
     return { valid: true };
   };
 
+  const normalizeCardinality = (cardinality) => {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) return cardinality;
+
+    const first = parseInt(match[1]);
+    const second = match[2] === "*" ? "*" : parseInt(match[2]).toString();
+
+    return `(${first},${second})`;
+  };
+
   const applyCustomCardinality = () => {
     const trimmedCardinality = customCardinality.trim();
     if (trimmedCardinality === "") {
@@ -333,13 +334,14 @@ export default function RelationshipInfo({ data }) {
       return;
     }
 
+    const normalizedCardinality = normalizeCardinality(trimmedCardinality);
     const timestamp = Date.now();
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
       rid: data.id,
       undo: { cardinality: data.cardinality },
-      redo: { cardinality: trimmedCardinality },
+      redo: { cardinality: normalizedCardinality },
       message: t("edit_relationship", {
         refName: data.name,
         extra: `[cardinality-${timestamp}]`,
@@ -347,7 +349,7 @@ export default function RelationshipInfo({ data }) {
     });
     setRelationships((prev) =>
       prev.map((e, idx) =>
-        idx === data.id ? { ...e, cardinality: trimmedCardinality } : e,
+        idx === data.id ? { ...e, cardinality: normalizedCardinality } : e,
       ),
     );
     setCustomCardinality("");

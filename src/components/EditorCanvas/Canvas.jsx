@@ -516,7 +516,8 @@ export default function Canvas() {
       return;
     }
 
-    updateRelationship(relationshipId, { cardinality: trimmedCardinality });
+    const normalizedCardinality = normalizeCardinality(trimmedCardinality);
+    updateRelationship(relationshipId, { cardinality: normalizedCardinality });
 
     setChangeCardinalityModal({
       visible: false,
@@ -1025,7 +1026,6 @@ export default function Canvas() {
   };
 
   const validateCustomCardinality = (cardinality) => {
-
     const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
     if (!match) {
       return {
@@ -1047,12 +1047,6 @@ export default function Canvas() {
 
     // Second coordinate must be * or a number greater than 1
     if (second !== "*") {
-      if (/^0\d+$/.test(second)) {
-        return {
-          valid: false,
-          message: "Second coordinate must not have leading zeros.",
-        };
-      }
       const secondNum = parseInt(second);
       if (isNaN(secondNum) || secondNum < 2) {
         return {
@@ -1063,6 +1057,16 @@ export default function Canvas() {
     }
 
     return { valid: true };
+  };
+
+  const normalizeCardinality = (cardinality) => {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) return cardinality;
+
+    const first = parseInt(match[1]);
+    const second = match[2] === "*" ? "*" : parseInt(match[2]).toString();
+
+    return `(${first},${second})`;
   };
 
   const handleDeleteRelationship = () => {
