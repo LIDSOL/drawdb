@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../../data/datatypes";
 import DefaultTypeSizes from "./DefaultTypeSizes";
 import ColorPicker from "../../ColorPicker";
-import { useState } from "react";
 
 export default function Defaults() {
   const { settings, setSettings } = useSettings();
