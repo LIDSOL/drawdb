@@ -2,6 +2,7 @@ import { Button } from "@douyinfe/semi-ui";
 import { IconCheckboxTick } from "@douyinfe/semi-icons";
 import { tableThemes } from "../data/constants";
 import { useTranslation } from "react-i18next";
+import { useSettings } from "../hooks";
 
 export default function ColorPalette({
   currentColor,
@@ -9,6 +10,7 @@ export default function ColorPalette({
   onPickColor,
 }) {
   const { t } = useTranslation();
+  const { settings } = useSettings();
   return (
     <div>
       <div className="flex justify-between items-center p-2">

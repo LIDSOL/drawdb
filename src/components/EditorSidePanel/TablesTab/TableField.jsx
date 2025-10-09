@@ -1,7 +1,13 @@
 import { Action, ObjectType } from "../../../data/constants";
 import { Row, Col, Input, Button, Popover, Select } from "@douyinfe/semi-ui";
 import { IconMore, IconKeyStroked } from "@douyinfe/semi-icons";
-import { useEnums, useDiagram, useTypes, useUndoRedo, useSettings } from "../../../hooks";
+import {
+  useEnums,
+  useDiagram,
+  useTypes,
+  useUndoRedo,
+  useSettings,
+} from "../../../hooks";
 import { useState } from "react";
 import FieldDetails from "./FieldDetails";
 import { useTranslation } from "react-i18next";
@@ -17,17 +23,18 @@ export default function TableField({ data, tid, index }) {
   const { t } = useTranslation();
   const { pushUndo } = useUndoRedo();
   const [editField, setEditField] = useState({});
-  const { settings } = useSettings()
+  const { settings } = useSettings();
 
   // Function to check if the FK field belongs to a subtype relationship
   const isSubtypeForeignKey = () => {
     if (!data.foreignK || !data.foreignKey) return false;
     // Search for subtype relationships where this table is a child table
-    return relationships.some(rel => {
+    return relationships.some((rel) => {
       // Check if it is a subtype relationship
       if (!rel.subtype) return false;
       // Check if this table is a child table in the subtype relationship
-      const isChildTable = rel.endTableId === tid ||
+      const isChildTable =
+        rel.endTableId === tid ||
         (rel.endTableIds && rel.endTableIds.includes(tid));
       // Check if the FK points to the parent table of the subtype relationship
       const pointsToParent = rel.startTableId === data.foreignKey.tableId;
@@ -36,8 +43,8 @@ export default function TableField({ data, tid, index }) {
   };
 
   const inconsistencyOfData = () => {
-    if(!data.primary) return false;
-    return relationships.some(rel => {
+    if (!data.primary) return false;
+    return relationships.some((rel) => {
       const parentTable = rel.startTableId === tid;
       return parentTable;
     });
@@ -51,30 +58,46 @@ export default function TableField({ data, tid, index }) {
           value={data.name}
           validateStatus={data.name.trim() === "" ? "error" : "default"}
           placeholder="Name"
-          onChange={(value) => updateField(tid, index, {
-              name: settings.upperCaseFields ? value.toUpperCase() : value.toLowerCase()
-          })}
+          style={
+            data.foreignK
+              ? {
+                  color: settings.defaultFkColor,
+                  fontWeight: "500",
+                }
+              : {}
+          }
+          onChange={(value) =>
+            updateField(tid, index, {
+              name: settings.upperCaseFields
+                ? value.toUpperCase()
+                : value.toLowerCase(),
+            })
+          }
           onKeyUp={(e) => {
             if (e.key === "Enter") {
-                //When pressing enter, focus the next input, if there is no next input, create a new field and focus it
-                const input = document.getElementById(`scroll_table_${tid}_input_${index+1}`);
-                if (input) input.focus();
-                else {
-          createNewField({
-            data,
-            settings,
-            database,
-            dbToTypes,
-            addFieldToTable,
-            pushUndo,
-            t,
-            tid,
-          });
-                    setTimeout(() => {
-                        const newInput = document.getElementById(`scroll_table_${tid}_input_${index+1}`);
-                        if (newInput) newInput.focus();
-                    }, 0);
-                }
+              //When pressing enter, focus the next input, if there is no next input, create a new field and focus it
+              const input = document.getElementById(
+                `scroll_table_${tid}_input_${index + 1}`,
+              );
+              if (input) input.focus();
+              else {
+                createNewField({
+                  data,
+                  settings,
+                  database,
+                  dbToTypes,
+                  addFieldToTable,
+                  pushUndo,
+                  t,
+                  tid,
+                });
+                setTimeout(() => {
+                  const newInput = document.getElementById(
+                    `scroll_table_${tid}_input_${index + 1}`,
+                  );
+                  if (newInput) newInput.focus();
+                }, 0);
+              }
             }
           }}
           onFocus={(e) => setEditField({ name: e.target.value })}
@@ -120,21 +143,21 @@ export default function TableField({ data, tid, index }) {
           value={data.type}
           validateStatus={data.type === "" ? "error" : "default"}
           placeholder="Type"
-            onChange={(value) => {
-              if (value === data.type) return;
-              pushUndo({
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: { type: data.type },
-                redo: { type: value },
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              });
+          onChange={(value) => {
+            if (value === data.type) return;
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              undo: { type: data.type },
+              redo: { type: value },
+              message: t("edit_table", {
+                tableName: tables[tid].name,
+                extra: "[field]",
+              }),
+            });
             const incr =
               data.increment && !!dbToTypes[database][value].canIncrement;
 
@@ -184,26 +207,26 @@ export default function TableField({ data, tid, index }) {
           type={data.notNull || data.primary ? "primary" : "tertiary"}
           title={t("not_null")}
           theme={data.notNull ? "solid" : "light"}
-            onClick={() => {
-              if (data.primary) {
-                Toast.info(t("pk_has_not_be_null"));
-                return;
-              }
-              pushUndo({
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: { notNull: data.notNull },
-                redo: { notNull: !data.notNull },
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              });
-              updateField(tid, index, { notNull: !data.notNull });
-            }}
+          onClick={() => {
+            if (data.primary) {
+              Toast.info(t("pk_has_not_be_null"));
+              return;
+            }
+            pushUndo({
+              action: Action.EDIT,
+              element: ObjectType.TABLE,
+              component: "field",
+              tid: tid,
+              fid: index,
+              undo: { notNull: data.notNull },
+              redo: { notNull: !data.notNull },
+              message: t("edit_table", {
+                tableName: tables[tid].name,
+                extra: "[field]",
+              }),
+            });
+            updateField(tid, index, { notNull: !data.notNull });
+          }}
         >
           ?
         </Button>
@@ -214,22 +237,22 @@ export default function TableField({ data, tid, index }) {
           title={t("primary")}
           theme={data.primary ? "solid" : "light"}
           onClick={() => {
-            if(data.primary && inconsistencyOfData()){
+            if (data.primary && inconsistencyOfData()) {
               Toast.info(t("inconsistency_of_data"));
               return;
             }
             // Check if it is a subtype relationship FK that cannot stop being PK
-            if(data.primary && isSubtypeForeignKey()){
+            if (data.primary && isSubtypeForeignKey()) {
               Toast.info(t("subtype_fk_must_be_pk"));
               return;
             }
-            const newStatePK=!data.primary;
-            const stateNull=newStatePK?true: !data.notNull;
+            const newStatePK = !data.primary;
+            const stateNull = newStatePK ? true : !data.notNull;
             const mustSetNotNull = !data.primary && !data.notNull;
             const changes = { primary: !data.primary };
 
-            const undo= { primary: data.primary , notNull : data.notNull };
-            const redo= { primary: newStatePK , notNull:stateNull };
+            const undo = { primary: data.primary, notNull: data.notNull };
+            const redo = { primary: newStatePK, notNull: stateNull };
 
             if (mustSetNotNull) {
               undo.notNull = data.notNull;
@@ -247,7 +270,10 @@ export default function TableField({ data, tid, index }) {
                 extra: "[field]",
               }),
             });
-            updateField(tid, index, { primary: newStatePK, notNull: stateNull });
+            updateField(tid, index, {
+              primary: newStatePK,
+              notNull: stateNull,
+            });
           }}
           icon={<IconKeyStroked />}
         />
