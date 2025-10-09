@@ -16,6 +16,7 @@ const defaultSettings = {
   defaultTextSize: 40,
   upperCaseFields: false,
   defaultNotNull: false,
+  defaultFkColor: '#2563eb', // blue-600
   defaultTypeSizes: {
     mysql: {
       VARCHAR: 255,

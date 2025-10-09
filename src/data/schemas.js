@@ -136,13 +136,13 @@ export const jsonSchema = {
           endTableId: { type: "integer" },
           endFieldId: { type: "integer" },
           // For subtype relationships, support multiple child tables
-          endTableIds: { 
-            type: "array", 
+          endTableIds: {
+            type: "array",
             items: { type: "integer" },
             description: "Array of child table IDs for subtype relationships"
           },
-          endFieldIds: { 
-            type: "array", 
+          endFieldIds: {
+            type: "array",
             items: { type: "integer" },
             description: "Array of child field IDs corresponding to endTableIds"
           },

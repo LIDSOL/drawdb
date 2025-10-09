@@ -141,6 +141,7 @@ const es = {
     default_field_type: "Tipo de campo predeterminado",
     uppercase_fields: "Campos en mayúsculas",
     default_not_null: "No nulo por defecto",
+    default_fk_color: "Color predeterminado de clave foránea",
     default_type_sizes: "Tamaños de tipo predeterminados",
     default_size: "Tamaño predeterminado",
     default_precision: "Precisión predeterminada",
@@ -259,7 +260,8 @@ const es = {
     readme: "README",
     Null_not_allowed:
       "No se permite una fk nula para relaciones identificativas",
-    No_primary_key_in_table: "No se puede intercambiar: no existe clave primaria",
+    No_primary_key_in_table:
+      "No se puede intercambiar: no existe clave primaria",
     Swap_successful: "Relación intercambiada con éxito",
   },
 };

@@ -301,10 +301,10 @@ export default function Table(props) {
           <div
             className={`overflow-hidden font-bold h-[40px] flex justify-between items-center border-b border-gray-400 ${
               settings.notation !== Notation.DEFAULT
-              ? "bg-transparent"
-              : settings.mode === "light"
-              ? "bg-zinc-200"
-              : "bg-zinc-900"
+                ? "bg-transparent"
+                : settings.mode === "light"
+                  ? "bg-zinc-200"
+                  : "bg-zinc-900"
             }`}
             onContextMenu={handleTableContextMenu}
           >
@@ -412,7 +412,14 @@ export default function Table(props) {
                       className="flex justify-between items-center pb-2"
                       style={{ direction: "ltr" }}
                     >
-                      <p className="me-4 font-bold">{e.name}</p>
+                      <p
+                        className={`me-4 font-bold`}
+                        style={{
+                          color: e.foreignK ? settings.defaultFkColor : 'inherit'
+                        }}
+                      >
+                        {e.name}
+                      </p>
                       <p className="ms-4">
                         {e.type +
                           ((dbToTypes[database][e.type].isSized ||
@@ -442,6 +449,11 @@ export default function Table(props) {
                     {e.increment && (
                       <Tag color="green" className="me-2 my-2">
                         {t("autoincrement")}
+                      </Tag>
+                    )}
+                    {e.foreignK && (
+                      <Tag color="blue" className="me-2 my-2">
+                        {t("foreign_key")}
                       </Tag>
                     )}
                     <p>
@@ -628,7 +640,14 @@ export default function Table(props) {
               }));
             }}
           />
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+          <span
+            className={`overflow-hidden text-ellipsis whitespace-nowrap ${
+              fieldData.foreignK ? "font-medium" : ""
+            }`}
+            style={{
+              color: fieldData.foreignK ? settings.defaultFkColor : 'inherit'
+            }}
+          >
             {fieldData.name}
           </span>
         </div>
