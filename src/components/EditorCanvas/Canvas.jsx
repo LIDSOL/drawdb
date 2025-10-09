@@ -13,7 +13,8 @@ import {
   Notation,
   Tab,
 } from "../../data/constants";
-import { Toast, Modal, Input } from "@douyinfe/semi-ui";
+import { dbToTypes } from "../../data/datatypes";
+import { Toast, Modal, Input, InputNumber } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
@@ -82,7 +83,9 @@ export default function Canvas() {
 
   const {
     tables,
+    database,
     updateTable,
+    updateField,
     relationships,
     addRelationship,
     addTable,
@@ -259,7 +262,19 @@ export default function Canvas() {
     relatedField: null, // { tableId, fieldId, tableName, fieldName }
   });
 
+  const [fieldPropertiesModal, setFieldPropertiesModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    field: null,
+  });
+
+  // Field properties modal internal state
+  const [fieldPropertiesPrecision, setFieldPropertiesPrecision] = useState("");
+  const [fieldPropertiesAccuracy, setFieldPropertiesAccuracy] = useState("");
+
   const fieldRenameInputRef = useRef(null);
+  const fieldPropertiesInputRef = useRef(null);
   const tableRenameInputRef = useRef(null);
   const relationshipRenameInputRef = useRef(null);
   const changeCardinalityInputRef = useRef(null);
@@ -302,6 +317,34 @@ export default function Canvas() {
       return () => clearTimeout(timer);
     }
   }, [relationshipRenameModal.visible]);
+
+  // Initialize field properties modal values when it opens
+  useEffect(() => {
+    if (fieldPropertiesModal.visible && fieldPropertiesModal.field) {
+      const field = fieldPropertiesModal.field;
+      if (field.size && field.size.includes(",")) {
+        const [prec, acc] = field.size.split(",");
+        setFieldPropertiesPrecision(parseInt(prec) || "");
+        setFieldPropertiesAccuracy(parseInt(acc?.trim()) || "");
+      } else {
+        setFieldPropertiesPrecision("");
+        setFieldPropertiesAccuracy("");
+      }
+    }
+  }, [fieldPropertiesModal.visible, fieldPropertiesModal.field]);
+
+  // Auto-focus field properties input when modal opens
+  useEffect(() => {
+    if (fieldPropertiesModal.visible && fieldPropertiesInputRef.current) {
+      const timer = setTimeout(() => {
+        if (fieldPropertiesInputRef.current) {
+          fieldPropertiesInputRef.current.focus();
+          fieldPropertiesInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [fieldPropertiesModal.visible]);
 
   // Auto select when the change cardinality modal opens
   useEffect(() => {
@@ -1699,6 +1742,79 @@ export default function Canvas() {
       currentName: "",
       newName: "",
     });
+  };
+
+  const handleFieldEditProperties = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+
+      setFieldPropertiesModal({
+        visible: true,
+        tableId: fieldContextMenu.tableId,
+        fieldId: fieldContextMenu.fieldId,
+        field: field,
+      });
+      handleFieldContextMenuClose();
+    }
+  };
+
+  const handleFieldPropertiesConfirm = () => {
+    const { tableId, fieldId } = fieldPropertiesModal;
+
+    let newSize = "";
+    if (fieldPropertiesPrecision && fieldPropertiesAccuracy !== "") {
+      newSize = `${fieldPropertiesPrecision},${fieldPropertiesAccuracy}`;
+    } else if (fieldPropertiesPrecision) {
+      newSize = fieldPropertiesPrecision.toString();
+    }
+
+    const updates = { size: newSize };
+
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.TABLE,
+      component: "field",
+      tid: tableId,
+      fid: fieldId,
+      undo: {
+        size:
+          tables
+            .find((t) => t.id === tableId)
+            ?.fields.find((f) => f.id === fieldId)?.size || "",
+      },
+      redo: updates,
+      message: t("edit_table", {
+        tableName: tables.find((t) => t.id === tableId)?.name || "",
+        extra: "[field properties]",
+      }),
+    });
+
+    updateField(tableId, fieldId, updates);
+    setFieldPropertiesModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      field: null,
+    });
+    setFieldPropertiesPrecision("");
+    setFieldPropertiesAccuracy("");
+  };
+
+  const handleFieldPropertiesCancel = () => {
+    setFieldPropertiesModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      field: null,
+    });
+    setFieldPropertiesPrecision("");
+    setFieldPropertiesAccuracy("");
   };
 
   const handleEditNoteContent = () => {
@@ -3294,6 +3410,7 @@ export default function Canvas() {
         onToggleNotNull={handleToggleFieldNotNull}
         onToggleUnique={handleToggleFieldUnique}
         onToggleAutoIncrement={handleToggleFieldAutoIncrement}
+        onEditProperties={handleFieldEditProperties}
       />
 
       <Modal
@@ -3556,6 +3673,136 @@ export default function Canvas() {
             <strong>&ldquo;{foreignKeyRenameModal.newName}&rdquo;</strong> as
             well to maintain consistency?
           </p>
+        </div>
+      </Modal>
+
+      <Modal
+        title={`Edit Properties - ${fieldPropertiesModal.field?.name || "Field"}`}
+        visible={
+          fieldPropertiesModal.visible &&
+          fieldPropertiesModal.field &&
+          dbToTypes[database] &&
+          dbToTypes[database][fieldPropertiesModal.field.type] &&
+          (dbToTypes[database][fieldPropertiesModal.field.type].hasPrecision ||
+            dbToTypes[database][fieldPropertiesModal.field.type].isSized)
+        }
+        onOk={handleFieldPropertiesConfirm}
+        onCancel={handleFieldPropertiesCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+        maskClosable={false}
+        keyboard={false}
+      >
+        <div style={{ padding: "20px 0" }}>
+          {fieldPropertiesModal.field &&
+          dbToTypes[database] &&
+          dbToTypes[database][fieldPropertiesModal.field.type] &&
+          dbToTypes[database][fieldPropertiesModal.field.type].hasPrecision ? (
+            <>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Total Digits (Precision):
+                </label>
+                <InputNumber
+                  ref={fieldPropertiesInputRef}
+                  value={fieldPropertiesPrecision}
+                  onChange={(value) => {
+                    setFieldPropertiesPrecision(value);
+                    // Auto-adjust accuracy if it would exceed the new limit
+                    if (
+                      fieldPropertiesAccuracy !== "" &&
+                      value &&
+                      fieldPropertiesAccuracy >= value
+                    ) {
+                      setFieldPropertiesAccuracy(Math.max(0, value - 1));
+                    }
+                  }}
+                  placeholder="Enter total digits"
+                  min={1}
+                  max={65}
+                  className="w-full"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleFieldPropertiesConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Decimal Digits (Accuracy):
+                </label>
+                <InputNumber
+                  value={fieldPropertiesAccuracy}
+                  onChange={(value) => {
+                    // Ensure accuracy doesn't exceed precision - 1
+                    const maxAccuracy = fieldPropertiesPrecision
+                      ? Math.max(0, fieldPropertiesPrecision - 1)
+                      : 9;
+                    const clampedValue = fieldPropertiesPrecision
+                      ? Math.min(value || 0, maxAccuracy)
+                      : value;
+                    setFieldPropertiesAccuracy(clampedValue);
+                  }}
+                  placeholder="Enter decimal digits"
+                  min={0}
+                  max={
+                    fieldPropertiesPrecision
+                      ? Math.max(0, fieldPropertiesPrecision - 1)
+                      : 9
+                  }
+                  className="w-full"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleFieldPropertiesConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div
+                style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}
+              >
+                Example: Precision=10, Accuracy=2 allows values like 12345678.90
+              </div>
+            </>
+          ) : (
+            <div style={{ marginBottom: "16px" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                }}
+              >
+                Size:
+              </label>
+              <InputNumber
+                ref={fieldPropertiesInputRef}
+                value={fieldPropertiesPrecision}
+                onChange={setFieldPropertiesPrecision}
+                placeholder="Enter size"
+                min={1}
+                className="w-full"
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleFieldPropertiesConfirm();
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </div>
