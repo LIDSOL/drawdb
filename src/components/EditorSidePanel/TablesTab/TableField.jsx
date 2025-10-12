@@ -20,6 +20,7 @@ import { useState } from "react";
 import FieldDetails from "./FieldDetails";
 import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../../data/datatypes";
+import { getUserDefaultPrecisionScale, getUserDefaultSize } from "../../../utils/typeDefaults";
 import { Toast } from "@douyinfe/semi-ui";
 import { createNewField } from "./createNewField";
 
@@ -170,13 +171,16 @@ export default function TableField({ data, tid, index }) {
                   values: data.values ? [...data.values] : [],
                   increment: incr,
                 });
-              } else if (
-                dbToTypes[database][value].isSized ||
-                dbToTypes[database][value].hasPrecision
-              ) {
+              } else if (dbToTypes[database][value].isSized) {
                 updateField(tid, index, {
                   type: value,
-                  size: dbToTypes[database][value].defaultSize,
+                  size: getUserDefaultSize(value, settings, database, dbToTypes),
+                  increment: incr,
+                });
+              } else if (dbToTypes[database][value].hasPrecision) {
+                updateField(tid, index, {
+                  type: value,
+                  size: getUserDefaultPrecisionScale(value, settings, database),
                   increment: incr,
                 });
               } else if (!dbToTypes[database][value].hasDefault || incr) {
