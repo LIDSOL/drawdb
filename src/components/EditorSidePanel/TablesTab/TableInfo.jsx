@@ -225,7 +225,7 @@ export default function TableInfo({ data }) {
         </Collapse>
       </Card>
       <div className="flex flex-col gap-1">
-      <div className="flex gap-1 w-full">  
+      <div className="flex gap-1 w-full">
         {!(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X)? (
           <Popover
             content={
@@ -275,7 +275,7 @@ export default function TableInfo({ data }) {
             />
           </Popover >
         ):null}
-      
+
         <div className="flex gap-1 flex grow">
           <Button
             block
@@ -343,7 +343,7 @@ export default function TableInfo({ data }) {
             <div className="flex items-center gap-5 mt-1">
             <Button
                 icon={<IconDeleteStroked />}
-                iconPosition="Right"
+                iconPosition="right"
                 type="danger"
                 onClick={() => deleteTable(data.id)}
                 className="flex-grow"
