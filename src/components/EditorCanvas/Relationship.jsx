@@ -326,6 +326,17 @@ export default function Relationship({
               connectionPointX = subtypePoint.x;
               connectionPointY = subtypePoint.y + 20;
             }
+
+            // Calculate cardinality position for each child
+            const lineLength = Math.sqrt(
+              Math.pow(childCenter.x - connectionPointX, 2) +
+              Math.pow(childCenter.y - connectionPointY, 2)
+            );
+            const cardinalityOffset = 30;
+            const cardinalityRatio = Math.min(cardinalityOffset / lineLength, 0.8);
+            const cardinalityX = connectionPointX + (childCenter.x - connectionPointX) * (1 - cardinalityRatio);
+            const cardinalityY = connectionPointY + (childCenter.y - connectionPointY) * (1 - cardinalityRatio);
+
             return (
               <g key={`child-group-${data.id}-${index}`}>
                 <line
@@ -352,6 +363,21 @@ export default function Relationship({
                   cursor="pointer"
                   onContextMenu={handleContextMenu}
                 />
+                {/* Show (0,1) cardinality near each child table */}
+                {settings.showCardinality && (
+                  <text
+                    x={cardinalityX}
+                    y={cardinalityY}
+                    fill={theme === "dark" ? "lightgrey" : "#333"}
+                    fontSize={12}
+                    fontWeight={400}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    className="group-hover:fill-sky-700"
+                  >
+                    {settings.notation === Notation.DEFAULT ? "(0,1)" : "(0,1)"}
+                  </text>
+                )}
               </g>
             );
           })}
@@ -517,8 +543,18 @@ export default function Relationship({
     const isDefault = settings.notation === Notation.DEFAULT;
     const fkFields = getForeignKeyFields();
 
-    // Skip cardinality calculation for subtype relationships
-    if (!data.subtype && data.relationshipType !== RelationshipType.SUBTYPE) {
+    // Calculate cardinality
+    if (data.subtype || data.relationshipType === RelationshipType.SUBTYPE) {
+      // For subtype relationships
+      if (isCrowOrIDEF) {
+        cardinalityStart = ParentCardinality.DEFAULT.label;
+        cardinalityEnd = ParentCardinality.NULLEABLE.label;
+      } else if (isDefault) {
+        cardinalityStart = "1";
+        cardinalityEnd = "0,1";
+      }
+    } else {
+      // For regular relationships
       if (isCrowOrIDEF) {
         const allNullable =
           fkFields.length > 0 && fkFields.every((field) => !field.notNull);
@@ -559,52 +595,43 @@ export default function Relationship({
       },
     };
 
-    // For subtype relationships, force specific notation regardless of global setting
-    const effectiveNotationKey = data.subtype
-      ? "default"
-      : settings.notation &&
-          Object.prototype.hasOwnProperty.call(
-            formats.notation,
-            settings.notation,
-          )
-        ? settings.notation
-        : Notation.DEFAULT;
+    const effectiveNotationKey = settings.notation &&
+      Object.prototype.hasOwnProperty.call(
+        formats.notation,
+        settings.notation,
+      )
+      ? settings.notation
+      : Notation.DEFAULT;
 
     const currentNotation = formats.notation[effectiveNotationKey];
 
     let parentFormat = null;
-    // Skip parent/child notation logic for subtype relationships
-    if (!data.subtype && data.relationshipType !== RelationshipType.SUBTYPE) {
-      if (settings.notation === Notation.CROWS_FOOT) {
-        if (cardinalityStart === "(1,1)") {
-          parentFormat = currentNotation.parent_lines;
-        } else if (cardinalityStart === "(0,1)") {
-          parentFormat = currentNotation.parent_diamond;
-        }
-      } else if (settings.notation === Notation.IDEF1X) {
-        if (cardinalityStart === "(0,1)") {
-          parentFormat = currentNotation.parent_diamond;
-        }
+    if (settings.notation === Notation.CROWS_FOOT) {
+      if (cardinalityStart === "(1,1)") {
+        parentFormat = currentNotation.parent_lines;
+      } else if (cardinalityStart === "(0,1)") {
+        parentFormat = currentNotation.parent_diamond;
+      }
+    } else if (settings.notation === Notation.IDEF1X) {
+      if (cardinalityStart === "(0,1)") {
+        parentFormat = currentNotation.parent_diamond;
       }
     }
 
     let childFormat;
-    // Skip child notation logic for subtype relationships
-    if (!data.subtype && data.relationshipType !== RelationshipType.SUBTYPE) {
-      if (settings.notation === Notation.CROWS_FOOT) {
-        childFormat = currentNotation.child;
-      } else if (settings.notation === Notation.IDEF1X) {
-        if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
-          childFormat = currentNotation.one_to_one;
-        } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
-          childFormat = currentNotation.one_to_many;
-        }
-      } else {
-        if (data.relationshipType === RelationshipType.ONE_TO_ONE) {
-          childFormat = currentNotation.one_to_one;
-        } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
-          childFormat = currentNotation.one_to_many;
-        }
+    if (settings.notation === Notation.CROWS_FOOT) {
+      childFormat = currentNotation.child;
+    } else if (settings.notation === Notation.IDEF1X) {
+      if (data.relationshipType === RelationshipType.ONE_TO_ONE || data.subtype) {
+        childFormat = currentNotation.one_to_one;
+      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+        childFormat = currentNotation.one_to_many;
+      }
+    } else {
+      if (data.relationshipType === RelationshipType.ONE_TO_ONE || data.subtype) {
+        childFormat = currentNotation.one_to_one;
+      } else if (data.relationshipType === RelationshipType.ONE_TO_MANY) {
+        childFormat = currentNotation.one_to_many;
       }
     }
 
@@ -750,9 +777,8 @@ export default function Relationship({
             strokeDasharray={relationshipType}
             strokeWidth={2}
           />
-          {/* Only show parent/child notations for non-subtype relationships */}
-          {!data.subtype &&
-            parentFormat &&
+          {/* Show parent/child notations for all relationships */}
+          {parentFormat &&
             parentFormat(
               cardinalityStartX,
               cardinalityStartY,
@@ -760,8 +786,7 @@ export default function Relationship({
               isVertical,
               cardinalityStart, // Add cardinality text
             )}
-          {!data.subtype &&
-            settings.notation === "default" &&
+          {settings.notation === "default" &&
             settings.showCardinality &&
             childFormat &&
             childFormat(
@@ -777,8 +802,7 @@ export default function Relationship({
               isVertical,
               vectorInfo, // Pass vector information
             )}
-          {!data.subtype &&
-            settings.notation !== "default" &&
+          {settings.notation !== "default" &&
             childFormat &&
             childFormat(
               pathRef,
