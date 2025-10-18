@@ -26,7 +26,7 @@ import {
 import { useDiagram, useSettings, useUndoRedo } from "../../../hooks";
 import i18n from "../../../i18n/i18n";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 const columns = [
   {
     title: i18n.t("primary"),
@@ -51,6 +51,17 @@ export default function RelationshipInfo({ data }) {
   } = useDiagram();
   const { t } = useTranslation();
   const [editField, setEditField] = useState({});
+  const [customCardinality, setCustomCardinality] = useState("");
+  const customInputRef = useRef(null);
+
+  // Auto focus on custom cardinality input when it appears
+  useEffect(() => {
+    if (customCardinality !== "" && customInputRef.current) {
+      setTimeout(() => {
+        customInputRef.current?.focus();
+      }, 0);
+    }
+  }, [customCardinality]);
   // Helper function to get the effective end table ID and field ID
   const getEffectiveEndTable = () => {
     if (data.endTableId !== undefined) {
@@ -85,6 +96,60 @@ export default function RelationshipInfo({ data }) {
       return;
     }
     const effectiveEndTable = getEffectiveEndTable();
+    const currentChildTableId = effectiveEndTable.tableId;
+    const currentParentTableId = data.startTableId;
+    // Find current child and parent tables
+    const currentChildTable = tables.find(t => t.id === currentChildTableId);
+    const currentParentTable = tables.find(t => t.id === currentParentTableId);
+    if (!currentChildTable || !currentParentTable) {
+      console.error("Cannot find child or parent table for swap operation");
+      return;
+    }
+
+    // Find and collect FK fields in current child table that reference the current parent
+    const currentFkFields = currentChildTable.fields.filter(field =>
+      field.foreignK &&
+      field.foreignKey &&
+      field.foreignKey.tableId === currentParentTableId
+    );
+
+    // Prepare new FK fields for the new child table (current parent)
+    const newChildTable = currentParentTable;
+    const newParentTable = currentChildTable;
+    const newParentPkFields = newParentTable.fields.filter(field => field.primary);
+    if (newParentPkFields.length === 0) {
+      Toast.error(t("No_primary_key_in_table"));
+      return;
+    }
+
+    // Find the primary key field that will be referenced by the new FK
+    const newParentPkField = newParentTable.fields.find(field => field.primary);
+    const newParentPkFieldId = newParentPkField ? newParentPkField.id : 0;
+
+    // Generate new FK fields for the new child table
+    const newFkFields = newParentPkFields.map((pkField, index) => ({
+      name: `${pkField.name}`,
+      type: pkField.type,
+      size: pkField.size,
+      notNull: true,
+      unique: false,
+      default: "",
+      check: "",
+      primary: false,
+      increment: false,
+      comment: `Foreign key referencing ${newParentTable.name}.${pkField.name}`,
+      foreignK: true,
+      foreignKey: {
+        tableId: newParentTable.id,
+        fieldId: pkField.id,
+      },
+      id: newChildTable.fields.reduce((maxId, f) => Math.max(maxId, typeof f.id === 'number' ? f.id : -1), -1) + 1 + index,
+    }));
+
+    // Store states for undo
+    const undoChildTableFields = JSON.parse(JSON.stringify(currentChildTable.fields));
+    const undoParentTableFields = JSON.parse(JSON.stringify(currentParentTable.fields));
+
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
@@ -94,32 +159,68 @@ export default function RelationshipInfo({ data }) {
         startFieldId: data.startFieldId,
         endTableId: effectiveEndTable.tableId,
         endFieldId: effectiveEndTable.fieldId,
+        // Store table states for FK restoration
+        childTableFields: undoChildTableFields,
+        parentTableFields: undoParentTableFields,
+        childTableId: currentChildTableId,
+        parentTableId: currentParentTableId,
+        removedFkFields: currentFkFields,
+        addedFkFields: newFkFields,
       },
       redo: {
         startTableId: effectiveEndTable.tableId,
-        startFieldId: effectiveEndTable.fieldId,
+        startFieldId: newParentPkFieldId, // Use the correct PK field ID
         endTableId: data.startTableId,
-        endFieldId: data.startFieldId,
+        endFieldId: newFkFields.length > 0 ? newFkFields[0].id : data.startFieldId,
+        // Store table states for FK restoration
+        childTableFields: undoParentTableFields,
+        parentTableFields: undoChildTableFields,
+        childTableId: currentParentTableId,
+        parentTableId: currentChildTableId,
+        removedFkFields: currentFkFields,
+        addedFkFields: newFkFields,
       },
       message: t("edit_relationship", {
         refName: data.name,
         extra: "[swap keys]",
       }),
     });
+
+    // Remove FK fields from current child table
+    const updatedCurrentChildFields = currentChildTable.fields.filter(field =>
+      !(field.foreignK &&
+        field.foreignKey &&
+        field.foreignKey.tableId === currentParentTableId)
+    ).map((f, i) => ({ ...f, id: i }));
+
+    // Add FK fields to new child table (current parent)
+    const updatedNewChildFields = [...newChildTable.fields, ...newFkFields];
+
+    // Update both tables
+    setTables((prevTables) =>
+      prevTables.map((table) => {
+        if (table.id === currentChildTableId) {
+          return { ...table, fields: updatedCurrentChildFields };
+        } else if (table.id === currentParentTableId) {
+          return { ...table, fields: updatedNewChildFields };
+        }
+        return table;
+      })
+    );
+
+    // Update relationship with swapped roles
     setRelationships((prev) =>
       prev.map((e, idx) =>
         idx === data.id
           ? {
               ...e,
-              name: `fk_${tables[effectiveEndTable.tableId].name}_${
-                tables[effectiveEndTable.tableId].fields[
-                  effectiveEndTable.fieldId
-                ].name
-              }_${tables[e.startTableId].name}`,
-              startTableId: effectiveEndTable.tableId,
-              startFieldId: effectiveEndTable.fieldId,
-              endTableId: e.startTableId,
-              endFieldId: e.startFieldId,
+              name: `fk_${newChildTable.name}_${
+                newFkFields.length > 0 ? newFkFields[0].name : 'field'
+              }_${newParentTable.name}`,
+              startTableId: currentChildTableId, // New parent (was child)
+              startFieldId: newParentPkFieldId, // New parent PK field
+              endTableId: currentParentTableId, // New child (was parent)
+              endFieldId: newFkFields.length > 0 ? newFkFields[0].id : 0, // New FK field
               // Clear multi-child arrays when swapping back to single format
               endTableIds: undefined,
               endFieldIds: undefined,
@@ -127,6 +228,7 @@ export default function RelationshipInfo({ data }) {
           : e,
       ),
     );
+    Toast.success(t("Swap_successful"));
   };
 
   const changeRelationshipType = (value) => {
@@ -219,6 +321,11 @@ export default function RelationshipInfo({ data }) {
   };
 
   const changeCardinality = (value) => {
+    if (value === "Custom...") {
+      setCustomCardinality(data.cardinality || "");
+      return;
+    }
+
     pushUndo({
       action: Action.EDIT,
       element: ObjectType.RELATIONSHIP,
@@ -235,6 +342,112 @@ export default function RelationshipInfo({ data }) {
         idx === data.id ? { ...e, cardinality: value } : e,
       ),
     );
+  };
+
+  const handleCustomCardinalityChange = (value) => {
+    setCustomCardinality(value);
+  };
+
+  const handleCustomCardinalityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyCustomCardinality();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelCustomCardinality();
+    }
+  };
+
+  const validateCustomCardinality = (cardinality) => {
+    // Check if it matches the pattern (x,y) where x and y are numbers
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) {
+      return {
+        valid: false,
+        message: t(
+          "cardinality_format_error",
+          "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
+        ),
+      };
+    }
+
+    const first = parseInt(match[1]);
+    const second = match[2];
+
+    // First coordinate must be 0 or 1
+    if (first !== 0 && first !== 1) {
+      return {
+        valid: false,
+        message: t(
+          "cardinality_first_error",
+          "First coordinate must be 0 or 1",
+        ),
+      };
+    }
+
+    // Second coordinate must be * or a number greater than 1
+    if (second !== "*") {
+      const secondNum = parseInt(second);
+      if (isNaN(secondNum) || secondNum < 2) {
+        return {
+          valid: false,
+          message: t(
+            "cardinality_second_error",
+            "Second coordinate must be greater than 1 or *",
+          ),
+        };
+      }
+    }
+
+    return { valid: true };
+  };
+
+  const normalizeCardinality = (cardinality) => {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) return cardinality;
+
+    const first = parseInt(match[1]);
+    const second = match[2] === "*" ? "*" : parseInt(match[2]).toString();
+
+    return `(${first},${second})`;
+  };
+
+  const applyCustomCardinality = () => {
+    const trimmedCardinality = customCardinality.trim();
+    if (trimmedCardinality === "") {
+      return;
+    }
+
+    // Validate the custom cardinality
+    const validation = validateCustomCardinality(trimmedCardinality);
+    if (!validation.valid) {
+      Toast.error(validation.message);
+      return;
+    }
+
+    const normalizedCardinality = normalizeCardinality(trimmedCardinality);
+    const timestamp = Date.now();
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.RELATIONSHIP,
+      rid: data.id,
+      undo: { cardinality: data.cardinality },
+      redo: { cardinality: normalizedCardinality },
+      message: t("edit_relationship", {
+        refName: data.name,
+        extra: `[cardinality-${timestamp}]`,
+      }),
+    });
+    setRelationships((prev) =>
+      prev.map((e, idx) =>
+        idx === data.id ? { ...e, cardinality: normalizedCardinality } : e,
+      ),
+    );
+    setCustomCardinality("");
+  };
+
+  const cancelCustomCardinality = () => {
+    setCustomCardinality("");
   };
 
   const changeSubtypeRestriction = (value) => {
@@ -504,31 +717,73 @@ export default function RelationshipInfo({ data }) {
         data.relationshipType !== RelationshipType.SUBTYPE && (
           <>
             <div className="font-semibold my-1">{t("cardinality")}:</div>
-            <div className="flex items-center w-full gap-2">
-              <Select
-                optionList={
-                  RelationshipCardinalities[data.relationshipType] &&
-                  RelationshipCardinalities[data.relationshipType].map((c) => ({
-                    label: c.label,
-                    value: c.label,
-                  }))
-                }
-                value={data.cardinality}
-                className="w-full"
-                onChange={changeCardinality}
-                disabled={!data.relationshipType}
-                placeholder={t("select_cardinality")}
-              />
-              {(settings.notation === Notation.CROWS_FOOT ||
-                settings.notation === Notation.IDEF1X) && (
-                <Button
-                  icon={<IconLoopTextStroked />}
-                  type="tertiary"
-                  onClick={toggleParentCardinality}
-                  aria-label="Toggle Parent Cardinality"
+            {customCardinality !== "" ? (
+              // Custom cardinality input mode
+              <div className="space-y-2">
+                <Input
+                  ref={customInputRef}
+                  value={customCardinality}
+                  onChange={handleCustomCardinalityChange}
+                  onKeyDown={handleCustomCardinalityKeyDown}
+                  placeholder={
+                    t("enter_custom_cardinality") ||
+                    "Enter cardinality: (0 or 1, number >1 or *). E.g., (0,5), (1,*)"
+                  }
+                  className="w-full"
                 />
-              )}
-            </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Format: (x,y) where x is 0 or 1, and y is greater than 1 or *
+                  <br />
+                  Press Enter to apply, Escape to cancel
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="small"
+                    type="primary"
+                    onClick={applyCustomCardinality}
+                    disabled={customCardinality.trim() === ""}
+                  >
+                    {t("apply") || "Apply"}
+                  </Button>
+                  <Button
+                    size="small"
+                    type="secondary"
+                    onClick={cancelCustomCardinality}
+                  >
+                    {t("cancel") || "Cancel"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Normal cardinality selection
+              <div className="flex items-center w-full gap-2">
+                <Select
+                  optionList={
+                    RelationshipCardinalities[data.relationshipType] &&
+                    RelationshipCardinalities[data.relationshipType].map(
+                      (c) => ({
+                        label: c.label,
+                        value: c.label,
+                      }),
+                    )
+                  }
+                  value={data.cardinality}
+                  className="w-full"
+                  onChange={changeCardinality}
+                  disabled={!data.relationshipType}
+                  placeholder={t("select_cardinality")}
+                />
+                {(settings.notation === Notation.CROWS_FOOT ||
+                  settings.notation === Notation.IDEF1X) && (
+                  <Button
+                    icon={<IconLoopTextStroked />}
+                    type="tertiary"
+                    onClick={toggleParentCardinality}
+                    aria-label="Toggle Parent Cardinality"
+                  />
+                )}
+              </div>
+            )}
           </>
         )}
       {/* Subtype restriction - only available when relationship type is SUBTYPE */}

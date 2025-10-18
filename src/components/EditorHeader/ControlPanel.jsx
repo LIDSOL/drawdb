@@ -20,6 +20,7 @@ import {
   InputNumber,
   Tooltip,
   Spin,
+  Tag,
   Toast,
   Popconfirm,
 } from "@douyinfe/semi-ui";
@@ -30,7 +31,7 @@ import {
   jsonToSQLite,
   jsonToMariaDB,
   jsonToSQLServer,
-  jsonToOracle,
+  jsonToOracleSQL,
 } from "../../utils/exportSQL/generic";
 import {
   ObjectType,
@@ -354,8 +355,28 @@ export default function ControlPanel({
             }
             // Restore the relationships that were deleted.
             if (a.data.deletedRelationships && Array.isArray(a.data.deletedRelationships)) {
-              a.data.deletedRelationships.forEach(rel => {
-                addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+              a.data.deletedRelationships.forEach((rel) => {
+                try {
+                  const relToCompare = { ...rel };
+                  // remove id for comparison
+                  delete relToCompare.id;
+                  // create a canonical string for comparison (stable ordering)
+                  const relKey = JSON.stringify(relToCompare, Object.keys(relToCompare).sort());
+
+                  const alreadyExists = relationships.some((existing) => {
+                    const e = { ...existing };
+                    delete e.id;
+                    const existingKey = JSON.stringify(e, Object.keys(e).sort());
+                    return existingKey === relKey;
+                  });
+
+                  if (!alreadyExists) {
+                    addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+                  }
+                } catch (e) {
+                  // Fallback to naive add on any error to avoid losing data
+                  addRelationship(JSON.parse(JSON.stringify(rel)), null, null, false);
+                }
               });
             }
             // Restore the relationships that were modified (their fieldId) to their original state.
@@ -588,10 +609,13 @@ export default function ControlPanel({
           // Redoing a field_delete means calling deleteField again.
           // a.data should contain { field, deletedRelationships, modifiedRelationshipsOriginalState, previousFields, childFieldsSnapshot }
           // The 'previousFields' in a.data is the state *before* the original deletion, which is what the *next* undo needs.
-          if (a.data && a.data.field && typeof a.data.tid !== 'undefined') {
-            actionForUndoStack.data = JSON.parse(JSON.stringify(a.data));
+          // Note: older entries may store tid at the root (a.tid) instead of inside a.data — prefer a.data.tid but fall back to a.tid.
+          const tidForDelete = a.data && typeof a.data.tid !== 'undefined' ? a.data.tid : a.tid;
+          if (a.data && a.data.field && typeof tidForDelete !== 'undefined') {
+            // Ensure the undo entry created by this redo has consistent data shape (include tid inside data)
+            actionForUndoStack.data = { ...(JSON.parse(JSON.stringify(a.data)) || {}), tid: tidForDelete };
 
-            deleteField(a.data.field, a.data.tid, false);
+            deleteField(a.data.field, tidForDelete, false);
           }
         } else if (a.component === "field_add") {
           if (tableBeforeRedo && a.data && a.data.fieldThatWasAdded) {
@@ -1010,13 +1034,15 @@ export default function ControlPanel({
       import_from: {
         children: [
           {
-            JSON: fileImport,
+            function: fileImport,
+            name: "JSON",
           },
           {
-            DBML: () => {
+            function: () => {
               setModal(MODAL.IMPORT);
               setImportFrom(IMPORT_FROM.DBML);
             },
+            name: "DBML",
           },
         ],
       },
@@ -1024,40 +1050,47 @@ export default function ControlPanel({
         ...(database === DB.GENERIC && {
           children: [
             {
-              MySQL: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
                 setImportDb(DB.MYSQL);
               },
+              name: "MySQL",
             },
             {
-              PostgreSQL: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
                 setImportDb(DB.POSTGRES);
               },
+              name: "PostgreSQL",
             },
             {
-              SQLite: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
                 setImportDb(DB.SQLITE);
               },
+              name: "SQLite",
             },
             {
-              MariaDB: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
                 setImportDb(DB.MARIADB);
               },
+              name: "MariaDB",
             },
             {
-              MSSQL: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
                 setImportDb(DB.MSSQL);
               },
+              name: "MSSQL",
             },
             {
-              Oracle: () => {
+              function: () => {
                 setModal(MODAL.IMPORT_SRC);
-                setImportDb(DB.ORACLE);
+                setImportDb(DB.ORACLESQL);
               },
+              name: "Oracle",
+              label: "Beta",
             },
           ],
         }),
@@ -1071,7 +1104,8 @@ export default function ControlPanel({
         ...(database === DB.GENERIC && {
           children: [
             {
-              MySQL: () => {
+              name: "MySQL",
+              function: () => {
                 setModal(MODAL.CODE);
                 const src = jsonToMySQL({
                   tables: tables,
@@ -1087,7 +1121,8 @@ export default function ControlPanel({
               },
             },
             {
-              PostgreSQL: () => {
+              name: "PostgreSQL",
+              function: () => {
                 setModal(MODAL.CODE);
                 const src = jsonToPostgreSQL({
                   tables: tables,
@@ -1103,7 +1138,8 @@ export default function ControlPanel({
               },
             },
             {
-              SQLite: () => {
+              name: "SQLite",
+              function: () => {
                 setModal(MODAL.CODE);
                 const src = jsonToSQLite({
                   tables: tables,
@@ -1119,7 +1155,8 @@ export default function ControlPanel({
               },
             },
             {
-              MariaDB: () => {
+              name: "MariaDB",
+              function: () => {
                 setModal(MODAL.CODE);
                 const src = jsonToMariaDB({
                   tables: tables,
@@ -1135,7 +1172,8 @@ export default function ControlPanel({
               },
             },
             {
-              MSSQL: () => {
+              name: "MSSQL",
+              function: () => {
                 setModal(MODAL.CODE);
                 const src = jsonToSQLServer({
                   tables: tables,
@@ -1151,9 +1189,11 @@ export default function ControlPanel({
               },
             },
             {
-              Oracle: () => {
+              label: "Beta",
+              name: "Oracle",
+              function: () => {
                 setModal(MODAL.CODE);
-                const src = jsonToOracle({
+                const src = jsonToOracleSQL({
                   tables: tables,
                   references: relationships,
                   types: types,
@@ -1164,7 +1204,7 @@ export default function ControlPanel({
                   data: src,
                   extension: "sql",
                 }));
-              }
+              },
             },
           ],
         }),
@@ -1188,7 +1228,8 @@ export default function ControlPanel({
       export_as: {
         children: [
           {
-            PNG: () => {
+            name: "PNG",
+            function: () => {
               toPng(document.getElementById("canvas")).then(function (dataUrl) {
                 setExportData((prev) => ({
                   ...prev,
@@ -1200,7 +1241,8 @@ export default function ControlPanel({
             },
           },
           {
-            JPEG: () => {
+            name: "JPEG",
+            function: () => {
               toJpeg(document.getElementById("canvas"), { quality: 0.95 }).then(
                 function (dataUrl) {
                   setExportData((prev) => ({
@@ -1214,7 +1256,8 @@ export default function ControlPanel({
             },
           },
           {
-            SVG: () => {
+            name: "SVG",
+            function: () => {
               const filter = (node) => node.tagName !== "i";
               toSvg(document.getElementById("canvas"), { filter: filter }).then(
                 function (dataUrl) {
@@ -1229,7 +1272,8 @@ export default function ControlPanel({
             },
           },
           {
-            JSON: () => {
+            name: "JSON",
+            function: () => {
               setModal(MODAL.CODE);
               const result = JSON.stringify(
                 {
@@ -1253,7 +1297,8 @@ export default function ControlPanel({
             },
           },
           {
-            DBML: () => {
+            name: "DBML",
+            function: () => {
               setModal(MODAL.CODE);
               const result = toDBML({
                 tables,
@@ -1268,7 +1313,8 @@ export default function ControlPanel({
             },
           },
           {
-            PDF: () => {
+            name: "PDF",
+            function: () => {
               const canvas = document.getElementById("canvas");
               toJpeg(canvas).then(function (dataUrl) {
                 const doc = new jsPDF("l", "px", [
@@ -1288,7 +1334,8 @@ export default function ControlPanel({
             },
           },
           {
-            MERMAID: () => {
+            name: "Mermaid",
+            function: () => {
               setModal(MODAL.CODE);
               const result = jsonToMermaid({
                 tables: tables,
@@ -1306,7 +1353,8 @@ export default function ControlPanel({
             },
           },
           {
-            readme: () => {
+            name: "Markdown",
+            function: () => {
               setModal(MODAL.CODE);
               const result = jsonToDocumentation({
                 tables: tables,
@@ -1474,17 +1522,20 @@ export default function ControlPanel({
       notation: {
         children: [
           {
-            default_notation: () => {
+            name: "Default",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.DEFAULT }));
             },
           },
           {
-            crows_foot_notation: () => {
+            name: "Crow's Foot",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.CROWS_FOOT }));
             },
           },
           {
-            idef1x_notation: () => {
+            name: "IDEF1X",
+            function: () => {
               setSettings((prev) => ({ ...prev, notation: Notation.IDEF1X }));
             },
           },
@@ -1518,7 +1569,8 @@ export default function ControlPanel({
       theme: {
         children: [
           {
-            light: () => {
+            name: t("light"),
+            function: () => {
               const body = document.body;
               if (body.hasAttribute("theme-mode")) {
                 body.setAttribute("theme-mode", "light");
@@ -1528,7 +1580,8 @@ export default function ControlPanel({
             },
           },
           {
-            dark: () => {
+            name: t("dark"),
+            function: () => {
               const body = document.body;
               if (body.hasAttribute("theme-mode")) {
                 body.setAttribute("theme-mode", "dark");
@@ -1852,9 +1905,9 @@ export default function ControlPanel({
                 const body = document.body;
                 if (body.hasAttribute("theme-mode")) {
                   if (body.getAttribute("theme-mode") === "light") {
-                    menu["view"]["theme"].children[1]["dark"]();
+                    menu["view"]["theme"].children[1].function();
                   } else {
-                    menu["view"]["theme"].children[0]["light"]();
+                    menu["view"]["theme"].children[0].function();
                   }
                 }
               }}
@@ -1953,7 +2006,7 @@ export default function ControlPanel({
                           if (menu[category][item].children) {
                             return (
                               <Dropdown
-                                style={{ width: "120px" }}
+                                style={{ width: "150px" }}
                                 key={item}
                                 position="rightTop"
                                 render={
@@ -1962,9 +2015,18 @@ export default function ControlPanel({
                                       (e, i) => (
                                         <Dropdown.Item
                                           key={i}
-                                          onClick={Object.values(e)[0]}
+                                          onClick={e.function}
+                                          className="flex justify-between"
                                         >
-                                          {t(Object.keys(e)[0])}
+                                          <span>{e.name}</span>
+                                          {e.label && (
+                                            <Tag
+                                              size="small"
+                                              color="light-blue"
+                                            >
+                                              {e.label}
+                                            </Tag>
+                                          )}
                                         </Dropdown.Item>
                                       ),
                                     )}

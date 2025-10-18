@@ -289,7 +289,9 @@ const en = {
     docs: "Docs",
     supported_types: "Supported file types:",
     defaults: "Defaults",
-    Null_not_allowed:"Null value for fk is not allowed in identifying relations"
+    Null_not_allowed:"Null value for fk is not allowed in identifying relations",
+    No_primary_key_in_table: "Cannot swap: New parent table has no primary key fields",
+    Swap_successful: "Relationship swapped successfully with FK fields updated",
   },
 };
 

@@ -13,7 +13,8 @@ import {
   Notation,
   Tab,
 } from "../../data/constants";
-import { Toast, Modal, Input } from "@douyinfe/semi-ui";
+import { dbToTypes } from "../../data/datatypes";
+import { Toast, Modal, Input, InputNumber } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
@@ -82,7 +83,9 @@ export default function Canvas() {
 
   const {
     tables,
+    database,
     updateTable,
+    updateField,
     relationships,
     addRelationship,
     addTable,
@@ -222,6 +225,13 @@ export default function Canvas() {
     newName: "",
   });
 
+  const [changeCardinalityModal, setChangeCardinalityModal] = useState({
+    visible: false,
+    relationshipId: null,
+    currentCardinality: "",
+    newCardinality: "",
+  });
+
   const [areaRenameModal, setAreaRenameModal] = useState({
     visible: false,
     areaId: null,
@@ -252,9 +262,22 @@ export default function Canvas() {
     relatedField: null, // { tableId, fieldId, tableName, fieldName }
   });
 
+  const [fieldPropertiesModal, setFieldPropertiesModal] = useState({
+    visible: false,
+    tableId: null,
+    fieldId: null,
+    field: null,
+  });
+
+  // Field properties modal internal state
+  const [fieldPropertiesPrecision, setFieldPropertiesPrecision] = useState("");
+  const [fieldPropertiesAccuracy, setFieldPropertiesAccuracy] = useState("");
+
   const fieldRenameInputRef = useRef(null);
+  const fieldPropertiesInputRef = useRef(null);
   const tableRenameInputRef = useRef(null);
   const relationshipRenameInputRef = useRef(null);
+  const changeCardinalityInputRef = useRef(null);
 
   // Auto-select text when field rename modal opens
   useEffect(() => {
@@ -294,6 +317,47 @@ export default function Canvas() {
       return () => clearTimeout(timer);
     }
   }, [relationshipRenameModal.visible]);
+
+  // Initialize field properties modal values when it opens
+  useEffect(() => {
+    if (fieldPropertiesModal.visible && fieldPropertiesModal.field) {
+      const field = fieldPropertiesModal.field;
+      if (field.size && field.size.includes(",")) {
+        const [prec, acc] = field.size.split(",");
+        setFieldPropertiesPrecision(parseInt(prec) || "");
+        setFieldPropertiesAccuracy(parseInt(acc?.trim()) || "");
+      } else {
+        setFieldPropertiesPrecision("");
+        setFieldPropertiesAccuracy("");
+      }
+    }
+  }, [fieldPropertiesModal.visible, fieldPropertiesModal.field]);
+
+  // Auto-focus field properties input when modal opens
+  useEffect(() => {
+    if (fieldPropertiesModal.visible && fieldPropertiesInputRef.current) {
+      const timer = setTimeout(() => {
+        if (fieldPropertiesInputRef.current) {
+          fieldPropertiesInputRef.current.focus();
+          fieldPropertiesInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [fieldPropertiesModal.visible]);
+
+  // Auto select when the change cardinality modal opens
+  useEffect(() => {
+    if (changeCardinalityModal.visible && changeCardinalityInputRef.current) {
+      const timer = setTimeout(() => {
+        if (changeCardinalityInputRef.current) {
+          changeCardinalityInputRef.current.focus();
+          changeCardinalityInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [changeCardinalityModal.visible]);
 
   // Centralized function to close all context menus
   const closeAllContextMenus = () => {
@@ -474,6 +538,46 @@ export default function Canvas() {
       relationshipId: null,
       currentName: "",
       newName: "",
+    });
+  };
+
+  const handleChangeCardinalityConfirm = () => {
+    const { relationshipId, newCardinality } = changeCardinalityModal;
+    const relationship = relationships.find((r) => r.id === relationshipId);
+
+    if (!relationship) return;
+
+    const trimmedCardinality = newCardinality.trim();
+    if (trimmedCardinality === "") {
+      handleChangeCardinalityCancel();
+      return;
+    }
+
+    const validation = validateCustomCardinality(trimmedCardinality);
+    if (!validation.valid) {
+      Toast.error(validation.message);
+      return;
+    }
+
+    const normalizedCardinality = normalizeCardinality(trimmedCardinality);
+    updateRelationship(relationshipId, { cardinality: normalizedCardinality });
+
+    setChangeCardinalityModal({
+      visible: false,
+      relationshipId: null,
+      currentCardinality: "",
+      newCardinality: "",
+    });
+
+    Toast.success("Cardinality updated.");
+  };
+
+  const handleChangeCardinalityCancel = () => {
+    setChangeCardinalityModal({
+      visible: false,
+      relationshipId: null,
+      currentCardinality: "",
+      newCardinality: "",
     });
   };
 
@@ -729,6 +833,7 @@ export default function Canvas() {
 
   const handleRenameRelationship = () => {
     if (relationshipContextMenu.relationshipId !== null) {
+      // Find relationship by id
       const relationship = relationships.find(
         (r) => r.id === relationshipContextMenu.relationshipId,
       );
@@ -942,25 +1047,69 @@ export default function Canvas() {
     if (relationshipContextMenu.relationshipId !== null) {
       const relationship =
         relationships[relationshipContextMenu.relationshipId];
-      if (relationship) {
-        pushUndo({
-          action: Action.EDIT,
-          element: ObjectType.RELATIONSHIP,
-          rid: relationshipContextMenu.relationshipId,
-          undo: { cardinality: relationship.cardinality },
-          redo: { cardinality: newCardinality },
-          message: `Change cardinality for ${relationship.name}`,
+      if (!relationship) {
+        handleRelationshipContextMenuClose();
+        return;
+      }
+
+      if (newCardinality === "Custom...") {
+        setChangeCardinalityModal({
+          visible: true,
+          relationshipId: relationshipContextMenu.relationshipId,
+          currentCardinality: relationship.cardinality || "",
+          newCardinality: relationship.cardinality || "",
         });
-        setRelationships((prev) =>
-          prev.map((e, idx) =>
-            idx === relationshipContextMenu.relationshipId
-              ? { ...e, cardinality: newCardinality }
-              : e,
-          ),
-        );
+      } else {
+        updateRelationship(relationshipContextMenu.relationshipId, {
+          cardinality: newCardinality,
+        });
       }
       handleRelationshipContextMenuClose();
     }
+  };
+
+  const validateCustomCardinality = (cardinality) => {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) {
+      return {
+        valid: false,
+        message: "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
+      };
+    }
+
+    const first = parseInt(match[1]);
+    const second = match[2];
+
+    // First coordinate must be 0 or 1
+    if (first !== 0 && first !== 1) {
+      return {
+        valid: false,
+        message: "First coordinate must be 0 or 1",
+      };
+    }
+
+    // Second coordinate must be * or a number greater than 1
+    if (second !== "*") {
+      const secondNum = parseInt(second);
+      if (isNaN(secondNum) || secondNum < 2) {
+        return {
+          valid: false,
+          message: "Second coordinate must be greater than 1 or *",
+        };
+      }
+    }
+
+    return { valid: true };
+  };
+
+  const normalizeCardinality = (cardinality) => {
+    const match = cardinality.match(/^\(\s*(\d+)\s*,\s*(\d+|\*)\s*\)$/);
+    if (!match) return cardinality;
+
+    const first = parseInt(match[1]);
+    const second = match[2] === "*" ? "*" : parseInt(match[2]).toString();
+
+    return `(${first},${second})`;
   };
 
   const handleDeleteRelationship = () => {
@@ -1033,7 +1182,6 @@ export default function Canvas() {
     }
   };
 
-  // Area context menu handlers
   const handleAreaContextMenu = (e, areaId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1155,7 +1303,6 @@ export default function Canvas() {
     }
   };
 
-  // Note context menu handlers
   const handleNoteContextMenu = (e, noteId, x, y) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1376,12 +1523,9 @@ export default function Canvas() {
     relatedTableId,
     relatedFieldId,
   ) => {
-    // Rename the original field
     renameFieldOnly(tableId, fieldId, newName);
-    // Rename the related field
     renameFieldOnly(relatedTableId, relatedFieldId, newName);
 
-    // Update relationship names to default when foreign key fields are renamed
     updateRelationshipNamesAfterFieldRename(
       tableId,
       fieldId,
@@ -1598,6 +1742,79 @@ export default function Canvas() {
       currentName: "",
       newName: "",
     });
+  };
+
+  const handleFieldEditProperties = () => {
+    if (
+      fieldContextMenu.tableId !== null &&
+      fieldContextMenu.fieldId !== null
+    ) {
+      const table = tables.find((t) => t.id === fieldContextMenu.tableId);
+      const field = table?.fields.find(
+        (f) => f.id === fieldContextMenu.fieldId,
+      );
+
+      setFieldPropertiesModal({
+        visible: true,
+        tableId: fieldContextMenu.tableId,
+        fieldId: fieldContextMenu.fieldId,
+        field: field,
+      });
+      handleFieldContextMenuClose();
+    }
+  };
+
+  const handleFieldPropertiesConfirm = () => {
+    const { tableId, fieldId } = fieldPropertiesModal;
+
+    let newSize = "";
+    if (fieldPropertiesPrecision && fieldPropertiesAccuracy !== "") {
+      newSize = `${fieldPropertiesPrecision},${fieldPropertiesAccuracy}`;
+    } else if (fieldPropertiesPrecision) {
+      newSize = fieldPropertiesPrecision.toString();
+    }
+
+    const updates = { size: newSize };
+
+    pushUndo({
+      action: Action.EDIT,
+      element: ObjectType.TABLE,
+      component: "field",
+      tid: tableId,
+      fid: fieldId,
+      undo: {
+        size:
+          tables
+            .find((t) => t.id === tableId)
+            ?.fields.find((f) => f.id === fieldId)?.size || "",
+      },
+      redo: updates,
+      message: t("edit_table", {
+        tableName: tables.find((t) => t.id === tableId)?.name || "",
+        extra: "[field properties]",
+      }),
+    });
+
+    updateField(tableId, fieldId, updates);
+    setFieldPropertiesModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      field: null,
+    });
+    setFieldPropertiesPrecision("");
+    setFieldPropertiesAccuracy("");
+  };
+
+  const handleFieldPropertiesCancel = () => {
+    setFieldPropertiesModal({
+      visible: false,
+      tableId: null,
+      fieldId: null,
+      field: null,
+    });
+    setFieldPropertiesPrecision("");
+    setFieldPropertiesAccuracy("");
   };
 
   const handleEditNoteContent = () => {
@@ -3193,6 +3410,7 @@ export default function Canvas() {
         onToggleNotNull={handleToggleFieldNotNull}
         onToggleUnique={handleToggleFieldUnique}
         onToggleAutoIncrement={handleToggleFieldAutoIncrement}
+        onEditProperties={handleFieldEditProperties}
       />
 
       <Modal
@@ -3258,6 +3476,51 @@ export default function Canvas() {
             placeholder={t("name")}
             onEnterPress={handleRelationshipRenameConfirm}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        title={t("change") + " Cardinality"}
+        visible={changeCardinalityModal.visible}
+        onOk={handleChangeCardinalityConfirm}
+        onCancel={handleChangeCardinalityCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+      >
+        <div style={{ padding: "20px 0" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontWeight: "bold",
+            }}
+          >
+            Cardinality:
+          </label>
+          <Input
+            ref={changeCardinalityInputRef}
+            value={changeCardinalityModal.newCardinality}
+            onChange={(value) =>
+              setChangeCardinalityModal((prev) => ({
+                ...prev,
+                newCardinality: value,
+              }))
+            }
+            placeholder={"e.g., (1,n)"}
+            onEnterPress={handleChangeCardinalityConfirm}
+          />
+
+          {/* ADD THIS SECTION FOR THE LEGEND */}
+          <div
+            style={{
+              marginTop: "10px",
+              fontSize: "12px",
+              color: "#a0a0a0",
+              lineHeight: "1.5",
+            }}
+          >
+            <p>Format: (x,y) where x is 0 or 1, and y is n, *, or a number.</p>
+          </div>
         </div>
       </Modal>
 
@@ -3410,6 +3673,136 @@ export default function Canvas() {
             <strong>&ldquo;{foreignKeyRenameModal.newName}&rdquo;</strong> as
             well to maintain consistency?
           </p>
+        </div>
+      </Modal>
+
+      <Modal
+        title={`Edit Properties - ${fieldPropertiesModal.field?.name || "Field"}`}
+        visible={
+          fieldPropertiesModal.visible &&
+          fieldPropertiesModal.field &&
+          dbToTypes[database] &&
+          dbToTypes[database][fieldPropertiesModal.field.type] &&
+          (dbToTypes[database][fieldPropertiesModal.field.type].hasPrecision ||
+            dbToTypes[database][fieldPropertiesModal.field.type].isSized)
+        }
+        onOk={handleFieldPropertiesConfirm}
+        onCancel={handleFieldPropertiesCancel}
+        okText={t("confirm")}
+        cancelText={t("cancel")}
+        maskClosable={false}
+        keyboard={false}
+      >
+        <div style={{ padding: "20px 0" }}>
+          {fieldPropertiesModal.field &&
+          dbToTypes[database] &&
+          dbToTypes[database][fieldPropertiesModal.field.type] &&
+          dbToTypes[database][fieldPropertiesModal.field.type].hasPrecision ? (
+            <>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Total Digits (Precision):
+                </label>
+                <InputNumber
+                  ref={fieldPropertiesInputRef}
+                  value={fieldPropertiesPrecision}
+                  onChange={(value) => {
+                    setFieldPropertiesPrecision(value);
+                    // Auto-adjust accuracy if it would exceed the new limit
+                    if (
+                      fieldPropertiesAccuracy !== "" &&
+                      value &&
+                      fieldPropertiesAccuracy >= value
+                    ) {
+                      setFieldPropertiesAccuracy(Math.max(0, value - 1));
+                    }
+                  }}
+                  placeholder="Enter total digits"
+                  min={1}
+                  max={65}
+                  className="w-full"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleFieldPropertiesConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Decimal Digits (Accuracy):
+                </label>
+                <InputNumber
+                  value={fieldPropertiesAccuracy}
+                  onChange={(value) => {
+                    // Ensure accuracy doesn't exceed precision - 1
+                    const maxAccuracy = fieldPropertiesPrecision
+                      ? Math.max(0, fieldPropertiesPrecision - 1)
+                      : 9;
+                    const clampedValue = fieldPropertiesPrecision
+                      ? Math.min(value || 0, maxAccuracy)
+                      : value;
+                    setFieldPropertiesAccuracy(clampedValue);
+                  }}
+                  placeholder="Enter decimal digits"
+                  min={0}
+                  max={
+                    fieldPropertiesPrecision
+                      ? Math.max(0, fieldPropertiesPrecision - 1)
+                      : 9
+                  }
+                  className="w-full"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleFieldPropertiesConfirm();
+                    }
+                  }}
+                />
+              </div>
+              <div
+                style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}
+              >
+                Example: Precision=10, Accuracy=2 allows values like 12345678.90
+              </div>
+            </>
+          ) : (
+            <div style={{ marginBottom: "16px" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                }}
+              >
+                Size:
+              </label>
+              <InputNumber
+                ref={fieldPropertiesInputRef}
+                value={fieldPropertiesPrecision}
+                onChange={setFieldPropertiesPrecision}
+                placeholder="Enter size"
+                min={1}
+                className="w-full"
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleFieldPropertiesConfirm();
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </div>

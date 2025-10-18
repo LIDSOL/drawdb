@@ -4,7 +4,6 @@ import {
   TextArea,
   Button,
   TagInput,
-  InputNumber,
   Checkbox,
   Toast,
 } from "@douyinfe/semi-ui";
@@ -32,7 +31,7 @@ export default function FieldDetails({ data, tid, index }) {
         disabled={dbToTypes[database][data.type].noDefault || data.increment}
         onChange={(value) => updateField(tid, index, { default: value })}
         onFocus={(e) => setEditField({ default: e.target.value })}
-            onBlur={(e) => {
+        onBlur={(e) => {
           if (e.target.value === editField.default) return;
           pushUndo({
             action: Action.EDIT,
@@ -87,67 +86,6 @@ export default function FieldDetails({ data, tid, index }) {
           />
         </>
       )}
-      {dbToTypes[database][data.type].isSized && (
-        <>
-          <div className="font-semibold">{t("size")}</div>
-          <InputNumber
-            className="my-2 w-full"
-            placeholder={t("size")}
-            value={data.size}
-            onChange={(value) => updateField(tid, index, { size: value })}
-            onFocus={(e) => setEditField({ size: e.target.value })}
-            onBlur={(e) => {
-              if (e.target.value === editField.size) return;
-              pushUndo({
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: editField,
-                redo: { size: e.target.value },
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              });
-            }}
-          />
-        </>
-      )}
-      {dbToTypes[database][data.type].hasPrecision && (
-        <>
-          <div className="font-semibold">{t("precision")}</div>
-          <Input
-            className="my-2 w-full"
-            placeholder={t("set_precision")}
-            validateStatus={
-              !data.size || /^\d+,\s*\d+$|^$/.test(data.size)
-                ? "default"
-                : "error"
-            }
-            value={data.size}
-            onChange={(value) => updateField(tid, index, { size: value })}
-            onFocus={(e) => setEditField({ size: e.target.value })}
-            onBlur={(e) => {
-              if (e.target.value === editField.size) return;
-              pushUndo({
-                action: Action.EDIT,
-                element: ObjectType.TABLE,
-                component: "field",
-                tid: tid,
-                fid: index,
-                undo: editField,
-                redo: { size: e.target.value },
-                message: t("edit_table", {
-                  tableName: tables[tid].name,
-                  extra: "[field]",
-                }),
-              });
-            }}
-          />
-        </>
-      )}
       {dbToTypes[database][data.type].hasCheck && (
         <>
           <div className="font-semibold">{t("check")}</div>
@@ -183,7 +121,7 @@ export default function FieldDetails({ data, tid, index }) {
         <Checkbox
           value="unique"
           checked={data.unique}
-            onChange={(checkedValues) => {
+          onChange={(checkedValues) => {
             // If trying to remove unique from a primary key, show warning and don't change
             if (data.primary && data.unique && !checkedValues.target.checked) {
               Toast.info(t("pk_has_to_be_unique"));
@@ -216,7 +154,7 @@ export default function FieldDetails({ data, tid, index }) {
           disabled={
             !dbToTypes[database][data.type].canIncrement || data.isArray
           }
-            onChange={(checkedValues) => {
+          onChange={(checkedValues) => {
             pushUndo({
               action: Action.EDIT,
               element: ObjectType.TABLE,
@@ -277,7 +215,7 @@ export default function FieldDetails({ data, tid, index }) {
         dbToTypes[database][data.type].signed && (
           <div className="flex justify-between items-center my-3">
             <div className="font-medium">{t("Unsigned")}</div>
-              <Checkbox
+            <Checkbox
               value="unsigned"
               checked={data.unsigned}
               onChange={(checkedValues) => {
@@ -288,8 +226,7 @@ export default function FieldDetails({ data, tid, index }) {
                   tid: tid,
                   fid: index,
                   undo: {
-                    [checkedValues.target.value]:
-                      !checkedValues.target.checked,
+                    [checkedValues.target.value]: !checkedValues.target.checked,
                   },
                   redo: {
                     [checkedValues.target.value]: checkedValues.target.checked,
@@ -313,7 +250,7 @@ export default function FieldDetails({ data, tid, index }) {
         value={data.comment}
         autosize
         rows={2}
-                onChange={(value) => updateField(tid, index, { comment: value })}
+        onChange={(value) => updateField(tid, index, { comment: value })}
         onFocus={(e) => setEditField({ comment: e.target.value })}
         onBlur={(e) => {
           if (e.target.value === editField.comment) return;

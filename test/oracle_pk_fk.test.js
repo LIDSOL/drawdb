@@ -1,8 +1,8 @@
 /* eslint-env jest */
-import { toOracle } from "../src/utils/exportSQL/oracle.js";
+import { toOracleSQL } from "../src/utils/exportSQL/oraclesql.js";
 import { DB } from "../src/data/constants.js";
 
-describe("toOracle", () => {
+describe("toOracleSQL", () => {
   test("should generate correct Oracle SQL for tables with relationships", () => {
     const diagram = {
       database: DB.ORACLE,
@@ -54,22 +54,22 @@ describe("toOracle", () => {
     };
 
     const expectedSQL = `CREATE TABLE casa (
-\t"id" NUMBER(10,0) NOT NULL,
-\t"xd" VARCHAR(255) NOT NULL,
-\tCONSTRAINT casa_pk PRIMARY KEY("id")
+\tid NUMBER(10,0) NOT NULL,
+\txd VARCHAR(255) NOT NULL,
+\tCONSTRAINT casa_pk PRIMARY KEY(id)
 );
 
 
 CREATE TABLE cuarto (
-\t"id" NUMBER,
-\tCONSTRAINT cuarto_pk PRIMARY KEY("id")
+\tid NUMBER,
+\tCONSTRAINT cuarto_pk PRIMARY KEY(id)
 );
 
 
 ALTER TABLE casa ADD CONSTRAINT casa_id_fk
-FOREIGN KEY("id") REFERENCES cuarto("id");`;
+FOREIGN KEY(id) REFERENCES cuarto(id);`;
 
-    const result = toOracle(diagram);
+    const result = toOracleSQL(diagram);
     expect(result.trim()).toBe(expectedSQL.trim());
   });
-}); 
+});

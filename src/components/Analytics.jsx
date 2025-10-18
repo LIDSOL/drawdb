@@ -6,9 +6,12 @@ const Analytics = () => {
 
   useEffect(() => {
     if (window.gtag) {
-      window.gtag("config", "G-JMYXZ0DKNV", {
-        page_path: location.pathname + location.search,
-      });
+      const isDev = import.meta.env.DEV;
+      if (isDev === false) {
+        window.gtag("config", "G-JMYXZ0DKNV", {
+          page_path: location.pathname + location.search,
+        });
+      }
     }
   }, [location]);
 

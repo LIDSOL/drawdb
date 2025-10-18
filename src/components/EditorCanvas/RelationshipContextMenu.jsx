@@ -69,7 +69,6 @@ export default function RelationshipContextMenu({
       document.addEventListener("click", handleClickOutside);
       document.addEventListener("keydown", handleEscape);
 
-      // Add mouse leave event to the menu element
       if (currentMenuRef) {
         currentMenuRef.addEventListener("mouseleave", handleMouseLeave);
       }
