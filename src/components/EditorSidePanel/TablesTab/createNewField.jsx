@@ -1,4 +1,5 @@
 import { Action, ObjectType } from "../../../data/constants";
+import { getUserDefaultPrecisionScale, getUserDefaultSize } from "../../../utils/typeDefaults";
 
 export function createNewField({
   data,
@@ -22,32 +23,6 @@ export function createNewField({
     });
 
     const incr = data.increment && !!dbToTypes[database][settings.defaultFieldType].canIncrement;
-    // Function to get the default size configured by the user
-    const getUserDefaultSize = (typeName) => {
-      const dbSettings = settings?.defaultTypeSizes?.[database] || {};
-      const userSize = dbSettings[typeName];
-      if (typeof userSize === 'number') {
-        return userSize;
-      }
-      return dbToTypes[database][typeName]?.defaultSize || '';
-    };
-    // Function to get the combined size for types with precision and scale
-    const getUserDefaultPrecisionScale = (typeName) => {
-      const dbSettings = settings?.defaultTypeSizes?.[database] || {};
-      const userSettings = dbSettings[typeName];
-      if (typeof userSettings === 'object') {
-        const precision = userSettings?.precision || 10;
-        const scale = userSettings?.scale;
-        // If it has a defined scale, combine as "precision,scale"
-        if (scale !== undefined && scale !== null) {
-          return `${precision},${scale}`;
-        }
-        // If it only has precision, return just the precision
-        return precision.toString();
-      }
-      // Default value for types with precision
-      return "10";
-    };
 
     // Base field data
     const newFieldData = {
@@ -76,12 +51,12 @@ export function createNewField({
     } else if (dbToTypes[database][settings.defaultFieldType].hasPrecision) {
       fieldUpdates = {
         ...fieldUpdates,
-        size: getUserDefaultPrecisionScale(settings.defaultFieldType),
+        size: getUserDefaultPrecisionScale(settings.defaultFieldType, settings, database),
       };
     } else if (dbToTypes[database][settings.defaultFieldType].isSized) {
       fieldUpdates = {
         ...fieldUpdates,
-        size: getUserDefaultSize(settings.defaultFieldType),
+        size: getUserDefaultSize(settings.defaultFieldType, settings, database, dbToTypes),
       };
     } else if (!dbToTypes[database][settings.defaultFieldType].hasDefault || incr) {
       fieldUpdates = {
