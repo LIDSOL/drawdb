@@ -660,6 +660,11 @@ export default function Relationship({
     const cardinalityStartOffset = 30;
     const cardinalityEndOffset = 37;
 
+  // If this is a subtype relationship we generally don't want to show a
+  // parent cardinality on the parent table. Use an empty string when
+  // passing to notation renderers so they skip drawing it.
+  const displayedCardinalityStart = data.subtype ? "" : cardinalityStart;
+
     if (pathRef.current) {
       const totalPathLength = pathRef.current.getTotalLength();
 
@@ -778,7 +783,7 @@ export default function Relationship({
             strokeWidth={2}
           />
           {/* Show parent/child notations for all relationships */}
-          {parentFormat &&
+          {parentFormat && !data.subtype &&
             parentFormat(
               cardinalityStartX,
               cardinalityStartY,
@@ -796,7 +801,7 @@ export default function Relationship({
               cardinalityStartX,
               cardinalityStartY,
               direction,
-              cardinalityStart,
+              displayedCardinalityStart,
               cardinalityEnd,
               settings.showCardinality,
               isVertical,
@@ -811,7 +816,7 @@ export default function Relationship({
               cardinalityStartX,
               cardinalityStartY,
               direction,
-              cardinalityStart,
+              displayedCardinalityStart,
               cardinalityEnd,
               settings.showCardinality,
               isVertical,
