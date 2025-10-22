@@ -304,7 +304,7 @@ export default function TableInfo({ data }) {
             <div className="flex items-center gap-5 mt-1">
             <Button
                 icon={<IconDeleteStroked />}
-                iconPosition="Right"
+                iconPosition="right"
                 type="danger"
                 onClick={() => deleteTable(data.id)}
                 className="flex-grow"
