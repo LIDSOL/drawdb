@@ -51,41 +51,6 @@ export default function Table(props) {
   const { t } = useTranslation();
   const { selectedElement, setSelectedElement } = useSelect();
 
-  useEffect(() => {
-    const desiredTableCase = settings.upperCaseFields
-      ? tableData.name.toUpperCase()
-      : tableData.name.toLowerCase();
-    const tableNameNeedsUpdate = tableData.name !== desiredTableCase;
-
-    const fieldsNeedUpdate = tableData.fields.some((field) => {
-      const desiredFieldCase = settings.upperCaseFields
-        ? field.name.toUpperCase()
-        : field.name.toLowerCase();
-      return field.name !== desiredFieldCase;
-    });
-
-    if (tableNameNeedsUpdate || fieldsNeedUpdate) {
-      const updatedFields = tableData.fields.map((field) => ({
-        ...field,
-        name: settings.upperCaseFields
-          ? field.name.toUpperCase()
-          : field.name.toLowerCase(),
-      }));
-
-      updateTable(tableData.id, {
-        name: settings.upperCaseFields
-          ? tableData.name.toUpperCase()
-          : tableData.name.toLowerCase(),
-        fields: updatedFields,
-      });
-    }
-  }, [
-    settings.upperCaseFields,
-    tableData.fields,
-    tableData.id,
-    tableData.name,
-    updateTable,
-  ]);
   const calculatedContentWidth = useMemo(() => {
     if (!tableData) return settings.tableWidth;
 

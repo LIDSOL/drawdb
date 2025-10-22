@@ -43,23 +43,20 @@ export default function TableInfo({ data }) {
           placeholder={t("name")}
           className="ms-2"
           onChange={(value) => updateTable(data.id, {
-              name: settings.upperCaseFields ? value.toUpperCase() : value.toLowerCase()
+              name: value
           })}
           onFocus={(e) => setEditField({ name: e.target.value })}
           onBlur={(e) => {
             if (e.target.value === editField.name) return;
-            const transformedValue = settings.upperCaseFields
-              ? e.target.value.toUpperCase()
-              : e.target.value.toLowerCase();
             pushUndo({
               action: Action.EDIT,
               element: ObjectType.TABLE,
               component: "self",
               tid: data.id,
               undo: editField,
-              redo: { name: transformedValue },
+              redo: { name: e.target.value},
               message: t("edit_table", {
-                tableName: transformedValue,
+                tableName: e.target.value,
                 extra: "[name]",
               }),
             });
@@ -189,7 +186,7 @@ export default function TableInfo({ data }) {
         </Card>
       )}
       <div className="flex flex-col gap-1">
-      <div className="flex gap-1 w-full">  
+      <div className="flex gap-1 w-full">
         {!(settings.notation === Notation.CROWS_FOOT || settings.notation === Notation.IDEF1X)? (
           <Popover
             content={
@@ -239,7 +236,7 @@ export default function TableInfo({ data }) {
             />
           </Popover >
         ):null}
-      
+
         <div className="flex gap-1 flex grow">
           <Button
             block

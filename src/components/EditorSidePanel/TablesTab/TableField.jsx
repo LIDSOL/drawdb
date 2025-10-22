@@ -71,9 +71,7 @@ export default function TableField({ data, tid, index }) {
             placeholder="Name"
             onChange={(value) =>
               updateField(tid, index, {
-                name: settings.upperCaseFields
-                  ? value.toUpperCase()
-                  : value.toLowerCase(),
+                name: value
               })
             }
             onKeyUp={(e) => {
@@ -106,9 +104,6 @@ export default function TableField({ data, tid, index }) {
             onFocus={(e) => setEditField({ name: e.target.value })}
             onBlur={(e) => {
               if (e.target.value === editField.name) return;
-              const transformedValue = settings.upperCaseFields
-                ? e.target.value.toUpperCase()
-                : e.target.value.toLowerCase();
               pushUndo({
                 action: Action.EDIT,
                 element: ObjectType.TABLE,
@@ -116,7 +111,7 @@ export default function TableField({ data, tid, index }) {
                 tid: tid,
                 fid: index,
                 undo: editField,
-                redo: { name: transformedValue },
+                redo: { name: e.target.value},
                 message: t("edit_table", {
                   tableName: tables[tid].name,
                   extra: "[field]",
