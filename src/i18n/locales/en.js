@@ -150,6 +150,7 @@ const en = {
     default_field_type: "Default field type",
     uppercase_fields: "Uppercase fields",
     default_not_null: "Default not null",
+    default_fk_color: "Default foreign key color",
     default_type_sizes: "Default type sizes",
     default_size: "Default size",
     default_precision: "Default precision",

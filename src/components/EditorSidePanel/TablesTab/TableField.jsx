@@ -252,8 +252,8 @@ export default function TableField({ data, tid, index }) {
               const mustSetNotNull = !data.primary && !data.notNull;
               const changes = { primary: !data.primary };
 
-              const undo = { primary: data.primary, notNull: data.notNull };
-              const redo = { primary: newStatePK, notNull: stateNull };
+            const undo = { primary: data.primary, notNull: data.notNull };
+            const redo = { primary: newStatePK, notNull: stateNull };
 
               if (mustSetNotNull) {
                 undo.notNull = data.notNull;
