@@ -344,7 +344,7 @@ export default function TableField({ data, tid, index }) {
               </Col>
               <Col span={12}>
                 <InputNumber
-                  placeholder="Accuracy"
+                  placeholder="Scale"
                   value={
                     data.size && data.size.includes(",")
                       ? parseInt(data.size.split(",")[1]?.trim()) || ""
@@ -394,7 +394,7 @@ export default function TableField({ data, tid, index }) {
           ) : (
             <Col span={24}>
               <InputNumber
-                placeholder={t("size")}
+                placeholder={t("Length/Size")}
                 value={data.size}
                 className="w-full"
                 onChange={(value) => updateField(tid, index, { size: value })}
