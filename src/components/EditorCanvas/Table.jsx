@@ -380,7 +380,7 @@ export default function Table(props) {
                       <p
                         className={`me-4 font-bold`}
                         style={{
-                          color: e.foreignK ? settings.defaultFkColor : 'inherit'
+                          color: e.foreignK ? (e.fkColor || settings.defaultFkColor) : 'inherit'
                         }}
                       >
                         {e.name}
@@ -610,7 +610,7 @@ export default function Table(props) {
               fieldData.foreignK ? "font-medium" : ""
             }`}
             style={{
-              color: fieldData.foreignK ? settings.defaultFkColor : 'inherit'
+              color: fieldData.foreignK ? (fieldData.fkColor || settings.defaultFkColor) : 'inherit'
             }}
           >
             {fieldData.name}
