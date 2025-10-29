@@ -69,6 +69,9 @@ export default function TableField({ data, tid, index }) {
             value={data.name}
             validateStatus={data.name.trim() === "" ? "error" : "default"}
             placeholder="Name"
+            style={{
+              color: data.foreignK ? (data.fkColor || settings.defaultFkColor) : 'inherit'
+            }}
             onChange={(value) =>
               updateField(tid, index, {
                 name: value
