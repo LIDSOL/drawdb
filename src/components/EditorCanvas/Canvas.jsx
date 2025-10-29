@@ -368,26 +368,6 @@ export default function Canvas() {
     }
   }, [changeCardinalityModal.visible]);
 
-  // Handle keyboard events for FK color modal
-  useEffect(() => {
-    if (!fieldForeignKeyColorModal.visible) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleFieldForeignKeyColorConfirm(fieldForeignKeyColorModal.currentColor);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        handleFieldForeignKeyColorCancel();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [fieldForeignKeyColorModal.visible, fieldForeignKeyColorModal.currentColor, handleFieldForeignKeyColorConfirm, handleFieldForeignKeyColorCancel]);
-
   // Centralized function to close all context menus
   const closeAllContextMenus = () => {
     setContextMenu({
@@ -1102,7 +1082,8 @@ export default function Canvas() {
     if (!match) {
       return {
         valid: false,
-        message: "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
+        message:
+          "Invalid format. Use (x,y) where x is 0 or 1, and y is greater than 1 or *",
       };
     }
 
@@ -1867,37 +1848,40 @@ export default function Canvas() {
     }
   };
 
-  const handleFieldForeignKeyColorConfirm = useCallback((color) => {
-    const { tableId, fieldId } = fieldForeignKeyColorModal;
+  const handleFieldForeignKeyColorConfirm = useCallback(
+    (color) => {
+      const { tableId, fieldId } = fieldForeignKeyColorModal;
 
-    pushUndo({
-      action: Action.EDIT,
-      element: ObjectType.TABLE,
-      component: "field",
-      tid: tableId,
-      fid: fieldId,
-      undo: {
-        fkColor:
-          tables
-            .find((t) => t.id === tableId)
-            ?.fields.find((f) => f.id === fieldId)?.fkColor || null,
-      },
-      redo: { fkColor: color },
-      message: t("edit_table", {
-        tableName: tables.find((t) => t.id === tableId)?.name || "",
-        extra: "[foreign key color]",
-      }),
-    });
+      pushUndo({
+        action: Action.EDIT,
+        element: ObjectType.TABLE,
+        component: "field",
+        tid: tableId,
+        fid: fieldId,
+        undo: {
+          fkColor:
+            tables
+              .find((t) => t.id === tableId)
+              ?.fields.find((f) => f.id === fieldId)?.fkColor || null,
+        },
+        redo: { fkColor: color },
+        message: t("edit_table", {
+          tableName: tables.find((t) => t.id === tableId)?.name || "",
+          extra: "[foreign key color]",
+        }),
+      });
 
-    updateField(tableId, fieldId, { fkColor: color });
-    setFieldForeignKeyColorModal({
-      visible: false,
-      tableId: null,
-      fieldId: null,
-      field: null,
-      currentColor: "",
-    });
-  }, [fieldForeignKeyColorModal, pushUndo, tables, t, updateField]);
+      updateField(tableId, fieldId, { fkColor: color });
+      setFieldForeignKeyColorModal({
+        visible: false,
+        tableId: null,
+        fieldId: null,
+        field: null,
+        currentColor: "",
+      });
+    },
+    [fieldForeignKeyColorModal, pushUndo, tables, t, updateField],
+  );
 
   const handleFieldForeignKeyColorCancel = useCallback(() => {
     setFieldForeignKeyColorModal({
@@ -1908,6 +1892,33 @@ export default function Canvas() {
       currentColor: "",
     });
   }, []);
+
+  // Handle keyboard events for FK color modal
+  useEffect(() => {
+    if (!fieldForeignKeyColorModal.visible) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleFieldForeignKeyColorConfirm(
+          fieldForeignKeyColorModal.currentColor,
+        );
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleFieldForeignKeyColorCancel();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    fieldForeignKeyColorModal.visible,
+    fieldForeignKeyColorModal.currentColor,
+    handleFieldForeignKeyColorConfirm,
+    handleFieldForeignKeyColorCancel,
+  ]);
 
   const handleEditNoteContent = () => {
     if (noteContextMenu.noteId !== null) {
@@ -3902,7 +3913,11 @@ export default function Canvas() {
       <Modal
         title={`${t("foreign_key")} Color - ${fieldForeignKeyColorModal.field?.name || "Field"}`}
         visible={fieldForeignKeyColorModal.visible}
-        onOk={() => handleFieldForeignKeyColorConfirm(fieldForeignKeyColorModal.currentColor)}
+        onOk={() =>
+          handleFieldForeignKeyColorConfirm(
+            fieldForeignKeyColorModal.currentColor,
+          )
+        }
         onCancel={handleFieldForeignKeyColorCancel}
         okText={t("confirm")}
         cancelText={t("cancel")}
@@ -3914,13 +3929,13 @@ export default function Canvas() {
           <ColorPicker
             currentColor={fieldForeignKeyColorModal.currentColor}
             onClearColor={() => {
-              setFieldForeignKeyColorModal(prev => ({
+              setFieldForeignKeyColorModal((prev) => ({
                 ...prev,
                 currentColor: settings.defaultFkColor,
               }));
             }}
             onPickColor={(color) => {
-              setFieldForeignKeyColorModal(prev => ({
+              setFieldForeignKeyColorModal((prev) => ({
                 ...prev,
                 currentColor: color,
               }));
