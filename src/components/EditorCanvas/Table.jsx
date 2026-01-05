@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../data/datatypes";
 import { isRtl } from "../../i18n/utils/rtl";
 import i18n from "../../i18n/i18n";
+import { getAllTablePerimeterPoints } from "../../utils/perimeterPoints";
 
 //Helper function to calculate text width
 const getTextWidth = (text, font) => {
@@ -44,6 +45,7 @@ export default function Table(props) {
     moving,
     onContextMenu,
     onFieldContextMenu,
+    isLinking = false, // New prop to know when linking is active
   } = props;
   const { layout } = useLayout();
   const { deleteTable, deleteField } = useDiagram();
@@ -447,6 +449,36 @@ export default function Table(props) {
           })}
         </div>
       </foreignObject>
+
+      {/* Perimeter connection points (shown when linking) */}
+      {isLinking && (() => {
+        const hasColorStrip = settings.notation === Notation.DEFAULT;
+        const perimeterPoints = getAllTablePerimeterPoints(tableData, hasColorStrip);
+
+        return perimeterPoints.map((point, idx) => (
+          <g key={`perimeter-${tableData.id}-${idx}`}>
+            {/* Outer ring for visibility */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="8"
+              fill="rgba(59, 130, 246, 0.2)"
+              stroke="#3b82f6"
+              strokeWidth="2"
+              className="pointer-events-none"
+            />
+            {/* Inner dot */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="#3b82f6"
+              className="pointer-events-none"
+            />
+          </g>
+        ));
+      })()}
+
       <SideSheet
         title={t("edit")}
         size="small"
