@@ -301,19 +301,7 @@ export default function TableInfo({ data }) {
             </Button>
 
             </div>
-            <div className="flex items-center gap-5 mt-1">
-            <Button
-                icon={<IconDeleteStroked />}
-                iconPosition="right"
-                type="danger"
-                onClick={() => deleteTable(data.id)}
-                className="flex-grow"
-            >
-                {t("delete_table_")}
-              </Button>
-          </div>
-      </div>
-            <Card
+<Card
         bodyStyle={{ padding: "4px" }}
         style={{ marginTop: "12px", marginBottom: "12px" }}
         headerLine={false}
@@ -349,6 +337,19 @@ export default function TableInfo({ data }) {
           </Collapse.Panel>
         </Collapse>
       </Card>
-    </div>
+
+            <div className="flex items-center gap-5 mt-1">
+            <Button
+                icon={<IconDeleteStroked />}
+                iconPosition="right"
+                type="danger"
+                onClick={() => deleteTable(data.id)}
+                className="flex-grow"
+            >
+                {t("delete_table_")}
+              </Button>
+          </div>
+      </div>
+                </div>
   );
 }
