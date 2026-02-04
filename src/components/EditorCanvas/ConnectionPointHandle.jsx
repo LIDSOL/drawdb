@@ -42,21 +42,6 @@ function PerimeterPointSelector({
                 style={{ pointerEvents: 'none' }}
               />
             )}
-
-            {/* Label on closest */}
-            {isClosest && (
-              <text
-                x={point.x}
-                y={point.y - 15}
-                fill="#374151"
-                fontSize="10"
-                fontWeight="600"
-                textAnchor="middle"
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                {point.side} • Field {point.fieldIndex + 1}
-              </text>
-            )}
           </g>
         );
       })}
@@ -112,21 +97,6 @@ export function ConnectionPointHandle({
         fill={type === 'start' ? "#ef4444" : "#3b82f6"} // Red for start, blue for end
         style={{ pointerEvents: 'none' }}
       />
-
-      {/* Label */}
-      {(isHovered || isSelected || isDragging) && (
-        <text
-          x={point.x}
-          y={point.y - 15}
-          fill="#374151"
-          fontSize="11"
-          fontWeight="600"
-          textAnchor="middle"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {isDragging ? 'Drag to point...' : (type === 'start' ? 'Start' : 'End')}
-        </text>
-      )}
     </g>
   );
 }
