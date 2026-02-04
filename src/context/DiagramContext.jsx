@@ -750,6 +750,30 @@ export default function DiagramContextProvider({ children }) {
     updateRelationship(id, { waypoints: waypoints || [] });
   };
 
+  // Adjust waypoints when a table moves
+  const adjustWaypointsForTableMove = (tableId, deltaX, deltaY) => {
+    // Update all relationships in a single state update
+    setRelationships((prevRelationships) => {
+      return prevRelationships.map(rel => {
+        // Check if this relationship is connected to the moved table
+        const isConnected =
+          rel.startTableId === tableId ||
+          rel.endTableId === tableId ||
+          (rel.endTableIds && rel.endTableIds.includes(tableId));
+
+        if (isConnected && rel.waypoints && rel.waypoints.length > 0) {
+          const adjustedWaypoints = rel.waypoints.map(waypoint => ({
+            x: waypoint.x + deltaX,
+            y: waypoint.y + deltaY
+          }));
+          return { ...rel, waypoints: adjustedWaypoints };
+        }
+
+        return rel;
+      });
+    });
+  };
+
   // Subtype relationship management functions
   const addChildToSubtype = (relationshipId, childTableId, shouldAddToUndoStack = true) => {
     // Critical validation: Prevent infinite loops
@@ -1039,6 +1063,7 @@ export default function DiagramContextProvider({ children }) {
         deleteRelationship,
         updateRelationship,
         updateRelationshipWaypoints,
+        adjustWaypointsForTableMove,
         addChildToSubtype,
         removeChildFromSubtype,
         restoreFieldsToTable,

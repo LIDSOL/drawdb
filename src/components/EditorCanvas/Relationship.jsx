@@ -1081,38 +1081,6 @@ export default function Relationship({
               </>
             )}
 
-          {/* Waypoint handles (only visible when selected and waypoints enabled) */}
-          {shouldUseWaypoints && showWaypoints && handlers.onWaypointMouseDown && (
-            <WaypointContainer
-              waypoints={waypoints}
-              relationshipId={data.id}
-              selectedWaypointIndex={draggedWaypointIndex}
-              hoveredWaypointIndex={hoveredWaypointIndex}
-              onWaypointMouseDown={handlers.onWaypointMouseDown}
-              onWaypointMouseEnter={handlers.onWaypointMouseEnter}
-              onWaypointMouseLeave={handlers.onWaypointMouseLeave}
-              onWaypointDoubleClick={handlers.onWaypointDoubleClick}
-              showVirtualBends={true}
-              virtualBends={virtualBends}
-              hoveredVirtualBendIndex={hoveredVirtualBendIndex}
-              onVirtualBendMouseDown={handlers.onVirtualBendMouseDown}
-              onVirtualBendMouseEnter={handlers.onVirtualBendMouseEnter}
-              onVirtualBendMouseLeave={handlers.onVirtualBendMouseLeave}
-            />
-          )}
-
-          {/* Connection point handles (start/end points - shown when relationship is selected) */}
-          {showWaypoints && data.startPoint && data.endPoint && actualStartPoint && actualEndPoint && (
-            <ConnectionPointHandles
-              startPoint={actualStartPoint}
-              endPoint={actualEndPoint}
-              isSelected={showWaypoints}
-              onStartPointChange={handleStartPointChange}
-              onEndPointChange={handleEndPointChange}
-              availableStartPoints={availableStartPoints}
-              availableEndPoints={availableEndPoints}
-            />
-          )}
         </g>
 
         <SideSheet

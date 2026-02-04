@@ -18,6 +18,7 @@ import { Toast, Modal, Input, InputNumber } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
+import RelationshipControls from "./RelationshipControls";
 import Note from "./Note";
 import TableContextMenu from "./TableContextMenu";
 import RelationshipContextMenu from "./RelationshipContextMenu";
@@ -97,6 +98,7 @@ export default function Canvas() {
     setRelationships,
     deleteField,
     removeChildFromSubtype,
+    adjustWaypointsForTableMove,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -2719,6 +2721,28 @@ export default function Canvas() {
 
     if (coordsDidUpdate(dragging.element)) {
       const info = getMovedElementDetails();
+      
+      // Adjust waypoints for moved tables
+      if (dragging.element === ObjectType.TABLE) {
+        if (Array.isArray(dragging.id)) {
+          // Multiple tables moved - adjust waypoints for each
+          dragging.id.forEach((tableId) => {
+            const initPos = dragging.initialPositions[tableId];
+            const currentTable = tables.find(t => t.id === tableId);
+            if (initPos && currentTable) {
+              const deltaX = currentTable.x - initPos.x;
+              const deltaY = currentTable.y - initPos.y;
+              adjustWaypointsForTableMove(tableId, deltaX, deltaY);
+            }
+          });
+        } else {
+          // Single table moved
+          const deltaX = info.x - dragging.prevX;
+          const deltaY = info.y - dragging.prevY;
+          adjustWaypointsForTableMove(dragging.id, deltaX, deltaY);
+        }
+      }
+      
       // Use pushUndo to ensure centralized filtering/deduplication
       pushUndo(
         (() => {
@@ -3345,6 +3369,45 @@ export default function Canvas() {
               onContextMenu={handleNoteContextMenu}
             />
           ))}
+          
+          {/* Render relationship controls (waypoints/handles) AFTER tables to ensure they're on top */}
+          {relationships
+            .filter((rel) => {
+              // Same filter logic as above
+              if (
+                rel.subtype &&
+                rel.endTableId !== undefined &&
+                !rel.endTableIds
+              ) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length > 1
+              ) {
+                return true;
+              }
+              if (!rel.subtype) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length === 1
+              ) {
+                return true;
+              }
+              return true;
+            })
+            .map((e, i) => {
+              return (
+                <RelationshipControls
+                  key={`controls-${e.id || i}`}
+                  data={e}
+                />
+              );
+            })}
         </svg>
       </div>
       {settings.showDebugCoordinates && (
