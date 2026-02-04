@@ -43,7 +43,6 @@ export default function RelationshipControls({ data }) {
 
   const {
     waypoints = [],
-    isDragging = false,
     draggedWaypointIndex = -1,
     hoveredWaypointIndex = -1,
     hoveredVirtualBendIndex = -1,

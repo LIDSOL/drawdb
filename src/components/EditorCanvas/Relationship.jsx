@@ -25,13 +25,10 @@ import {
   DefaultNotation,
 } from "./RelationshipFormat";
 import { subDT, subDP, subOT, subOP } from "./subtypeFormats";
-import { WaypointContainer } from "./WaypointHandle";
-import { ConnectionPointHandles } from "./ConnectionPointHandle";
 import { getConnectionPoints } from "../../utils/perimeter";
 import {
   calculateOrthogonalPath,
   getFieldPerimeterPoints,
-  getAllTablePerimeterPoints
 } from "../../utils/perimeterPoints";
 
 const labelFontSize = 16;
@@ -42,7 +39,7 @@ export default function Relationship({
   onContextMenu,
 }) {
   const { settings } = useSettings();
-  const { tables, updateRelationshipWaypoints, updateRelationship } = useDiagram();
+  const { tables, updateRelationshipWaypoints } = useDiagram();
   const { layout } = useLayout();
   const { selectedElement, setSelectedElement } = useSelect();
   const { t } = useTranslation();
@@ -204,8 +201,8 @@ export default function Relationship({
   // Waypoint editor hook - always call hook but may not be active for subtype relationships
   const shouldUseWaypoints = !data.subtype && startTable && endTable;
   const waypointsData = useWaypointEditor(
-    shouldUseWaypoints ? data : null, 
-    tables, 
+    shouldUseWaypoints ? data : null,
+    tables,
     (updatedWaypoints) => {
       if (shouldUseWaypoints) {
         updateRelationshipWaypoints(data.id, updatedWaypoints);
@@ -216,12 +213,8 @@ export default function Relationship({
   const {
     waypoints = [],
     isDragging = false,
-    draggedWaypointIndex = -1,
-    hoveredWaypointIndex = -1,
-    hoveredVirtualBendIndex = -1,
     showWaypoints = false,
     setShowWaypoints = () => {},
-    virtualBends = [],
     handlers = {},
   } = (shouldUseWaypoints && waypointsData) ? waypointsData : {};
 
@@ -249,34 +242,6 @@ export default function Relationship({
       };
     }
   }, [isDragging, handlers, shouldUseWaypoints]);
-
-  // Handlers for changing connection points (start/end)
-  // These are called when user drags a handle to a different perimeter point
-  const handleStartPointChange = (newPoint) => {
-    if (!newPoint) return;
-
-    updateRelationship(data.id, {
-      startPoint: {
-        x: newPoint.x,
-        y: newPoint.y,
-        side: newPoint.side,
-        fieldIndex: newPoint.fieldIndex
-      }
-    });
-  };
-
-  const handleEndPointChange = (newPoint) => {
-    if (!newPoint) return;
-
-    updateRelationship(data.id, {
-      endPoint: {
-        x: newPoint.x,
-        y: newPoint.y,
-        side: newPoint.side,
-        fieldIndex: newPoint.fieldIndex
-      }
-    });
-  };
 
   try {
     if (data.subtype && settings.notation === Notation.DEFAULT) {
@@ -837,8 +802,6 @@ export default function Relationship({
     let pathString;
     let actualStartPoint = null;
     let actualEndPoint = null;
-    let availableStartPoints = [];
-    let availableEndPoints = [];
 
     // Check if relationship has stored connection points
     if (data.startPoint && data.endPoint && startTable && endTable) {
@@ -862,10 +825,6 @@ export default function Relationship({
         hasColorStrip
       );
       actualEndPoint = endFieldPerimeter[data.endPoint.side] || endFieldPerimeter.left;
-
-      // Calculate all available perimeter points for double-click selection
-      availableStartPoints = getAllTablePerimeterPoints(startTable, hasColorStrip);
-      availableEndPoints = getAllTablePerimeterPoints(endTable, hasColorStrip);
 
       // Use orthogonal routing with recalculated points and table bounds
       pathString = calculateOrthogonalPath(
