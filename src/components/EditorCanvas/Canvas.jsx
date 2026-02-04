@@ -18,6 +18,7 @@ import { Toast, Modal, Input, InputNumber } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
+import RelationshipControls from "./RelationshipControls";
 import Note from "./Note";
 import TableContextMenu from "./TableContextMenu";
 import RelationshipContextMenu from "./RelationshipContextMenu";
@@ -40,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { useEventListener } from "usehooks-ts";
 import { areFieldsCompatible } from "../../utils/utils";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getAllTablePerimeterPoints, findClosestPerimeterPoint, getFieldPerimeterPoints, calculateOrthogonalPath } from "../../utils/perimeterPoints";
 
 export default function Canvas() {
   const { t } = useTranslation();
@@ -96,6 +98,7 @@ export default function Canvas() {
     setRelationships,
     deleteField,
     removeChildFromSubtype,
+    adjustWaypointsForTableMove,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -111,6 +114,7 @@ export default function Canvas() {
     useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
+  
   const [dragging, setDragging] = useState({
     element: ObjectType.NONE,
     id: -1,
@@ -133,6 +137,8 @@ export default function Canvas() {
     startY: 0,
     endX: 0,
     endY: 0,
+    startPoint: null, // Perimeter point info: {x, y, side, fieldIndex}
+    previewEndPoint: null, // Preview point for mouse hover
   });
 
   // Estado para conexiones de jerarquía
@@ -2250,11 +2256,40 @@ export default function Canvas() {
     }
 
     if (linking) {
-      setLinkingLine({
+      const updates = {
         ...linkingLine,
         endX: pointer.spaces.diagram.x,
         endY: pointer.spaces.diagram.y,
-      });
+      };
+
+      // If hovering over a table, calculate preview endpoint on perimeter
+      if (hoveredTable.tableId >= 0 && hoveredTable.fieldId >= 0) {
+        const targetTable = tables.find(t => t.id === hoveredTable.tableId);
+        if (targetTable) {
+          const hasColorStrip = settings.notation === Notation.DEFAULT;
+          const allPerimeterPoints = getAllTablePerimeterPoints(targetTable, hasColorStrip);
+
+          // Find closest perimeter point to mouse position
+          const closestPoint = findClosestPerimeterPoint(
+            allPerimeterPoints,
+            pointer.spaces.diagram.x,
+            pointer.spaces.diagram.y,
+            100 // threshold
+          );
+
+          if (closestPoint) {
+            updates.previewEndPoint = closestPoint;
+            updates.endTableId = hoveredTable.tableId;
+          } else {
+            updates.previewEndPoint = null;
+          }
+        }
+      } else {
+        updates.previewEndPoint = null;
+        updates.endTableId = -1;
+      }
+
+      setLinkingLine(updates);
     } else if (resizing.element === ObjectType.TABLE && resizing.id >= 0) {
       const table = tables.find((t) => t.id === resizing.id);
       const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180);
@@ -2686,6 +2721,28 @@ export default function Canvas() {
 
     if (coordsDidUpdate(dragging.element)) {
       const info = getMovedElementDetails();
+      
+      // Adjust waypoints for moved tables
+      if (dragging.element === ObjectType.TABLE) {
+        if (Array.isArray(dragging.id)) {
+          // Multiple tables moved - adjust waypoints for each
+          dragging.id.forEach((tableId) => {
+            const initPos = dragging.initialPositions[tableId];
+            const currentTable = tables.find(t => t.id === tableId);
+            if (initPos && currentTable) {
+              const deltaX = currentTable.x - initPos.x;
+              const deltaY = currentTable.y - initPos.y;
+              adjustWaypointsForTableMove(tableId, deltaX, deltaY);
+            }
+          });
+        } else {
+          // Single table moved
+          const deltaX = info.x - dragging.prevX;
+          const deltaY = info.y - dragging.prevY;
+          adjustWaypointsForTableMove(dragging.id, deltaX, deltaY);
+        }
+      }
+      
       // Use pushUndo to ensure centralized filtering/deduplication
       pushUndo(
         (() => {
@@ -2802,16 +2859,39 @@ export default function Canvas() {
     }
     setPanning((old) => ({ ...old, isPanning: false }));
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
+
+    // Calculate startPoint with perimeter information
+    const parentTable = tables.find((t) => t.id === fieldTableid);
+    let startPoint = null;
+
+    if (parentTable) {
+      const fieldIndex = parentTable.fields.findIndex(f => f.id === field.id);
+      const hasColorStrip = settings.notation === Notation.DEFAULT;
+
+      // Get perimeter points for this field
+      const fieldPerimeterPoints = getFieldPerimeterPoints(
+        parentTable,
+        fieldIndex,
+        parentTable.fields.length,
+        hasColorStrip
+      );
+
+      // Use the right side by default (common starting point)
+      startPoint = fieldPerimeterPoints.right;
+    }
+
     setLinkingLine({
       ...linkingLine,
       startTableId: fieldTableid,
       startFieldId: field.id,
-      startX: pointer.spaces.diagram.x,
-      startY: pointer.spaces.diagram.y,
-      endX: pointer.spaces.diagram.x,
-      endY: pointer.spaces.diagram.y,
+      startX: startPoint ? startPoint.x : pointer.spaces.diagram.x,
+      startY: startPoint ? startPoint.y : pointer.spaces.diagram.y,
+      endX: startPoint ? startPoint.x : pointer.spaces.diagram.x,
+      endY: startPoint ? startPoint.y : pointer.spaces.diagram.y,
       endTableId: -1,
       endFieldId: -1,
+      startPoint: startPoint,
+      previewEndPoint: null,
     });
     setLinking(true);
   };
@@ -2906,6 +2986,26 @@ export default function Canvas() {
       (f) => f.id === linkingLine.startFieldId,
     );
     const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : "table"}`;
+    
+    // Calculate perimeter points for start and end
+    const hasColorStrip = settings.notation === Notation.DEFAULT;
+    const startFieldIndex = parentTable.fields.findIndex(f => f.id === linkingLine.startFieldId);
+    const startPerimeterPoints = getFieldPerimeterPoints(
+      parentTable,
+      startFieldIndex,
+      parentTable.fields.length,
+      hasColorStrip
+    );
+    
+    // Get all perimeter points for end table to find closest one
+    const endTablePerimeterPoints = getAllTablePerimeterPoints(childTable, hasColorStrip);
+    const closestEndPoint = findClosestPerimeterPoint(
+      endTablePerimeterPoints,
+      linkingLine.endX,
+      linkingLine.endY,
+      50 // threshold
+    );
+    
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -2918,6 +3018,10 @@ export default function Canvas() {
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
+      // Store perimeter connection points
+      startPoint: startPerimeterPoints.right, // Default to right side of start field
+      endPoint: closestEndPoint || endTablePerimeterPoints[0], // Use closest or first point
+      waypoints: [], // Initialize empty waypoints for orthogonal routing
     };
 
     delete newRelationship.startX;
@@ -3165,14 +3269,16 @@ export default function Canvas() {
               }
               return true;
             })
-            .map((e, i) => (
-              <Relationship
-                key={e.id || i}
-                data={e}
-                onContextMenu={handleRelationshipContextMenu}
-                onConnectSubtypePoint={handleSubtypePointClick}
-              />
-            ))}
+            .map((e, i) => {
+              return (
+                <Relationship
+                  key={e.id || i}
+                  data={e}
+                  onContextMenu={handleRelationshipContextMenu}
+                  onConnectSubtypePoint={handleSubtypePointClick}
+                />
+              );
+            })}
           {tables.map((table) => {
             const isMoving =
               dragging.element === ObjectType.TABLE &&
@@ -3187,6 +3293,7 @@ export default function Canvas() {
                 setHoveredTable={setHoveredTable}
                 handleGripField={handleGripField}
                 setLinkingLine={setLinkingLine}
+                isLinking={linking}
                 onPointerDown={(e) =>
                   handlePointerDownOnElement(e, table.id, ObjectType.TABLE)
                 }
@@ -3209,7 +3316,33 @@ export default function Canvas() {
               />
             )
           }
-          {linking && (
+          {linking && linkingLine.startPoint && (
+            <path
+              d={(() => {
+                // If we have both start and preview end points, use orthogonal routing
+                if (linkingLine.previewEndPoint) {
+                  const startTable = tables.find(t => t.id === linkingLine.startTableId);
+                  const endTable = tables.find(t => t.id === linkingLine.endTableId);
+
+                  if (startTable && endTable) {
+                    return calculateOrthogonalPath(
+                      linkingLine.startPoint,
+                      linkingLine.previewEndPoint,
+                      []
+                    );
+                  }
+                }
+                // Fallback to simple line
+                return `M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`;
+              })()}
+              stroke="#3b82f6"
+              strokeDasharray="8,8"
+              strokeWidth="2"
+              fill="none"
+              className="pointer-events-none touch-none"
+            />
+          )}
+          {linking && !linkingLine.startPoint && (
             <path
               d={`M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`}
               stroke="red"
@@ -3236,6 +3369,45 @@ export default function Canvas() {
               onContextMenu={handleNoteContextMenu}
             />
           ))}
+          
+          {/* Render relationship controls (waypoints/handles) AFTER tables to ensure they're on top */}
+          {relationships
+            .filter((rel) => {
+              // Same filter logic as above
+              if (
+                rel.subtype &&
+                rel.endTableId !== undefined &&
+                !rel.endTableIds
+              ) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length > 1
+              ) {
+                return true;
+              }
+              if (!rel.subtype) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length === 1
+              ) {
+                return true;
+              }
+              return true;
+            })
+            .map((e, i) => {
+              return (
+                <RelationshipControls
+                  key={`controls-${e.id || i}`}
+                  data={e}
+                />
+              );
+            })}
         </svg>
       </div>
       {settings.showDebugCoordinates && (

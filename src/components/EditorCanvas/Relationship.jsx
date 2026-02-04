@@ -1,4 +1,4 @@
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import {
   RelationshipType,
   RelationshipCardinalities,
@@ -13,7 +13,7 @@ import {
   SubtypeRestriction,
 } from "../../data/constants";
 import { calcPath } from "../../utils/calcPath";
-import { useDiagram, useSettings, useLayout, useSelect } from "../../hooks";
+import { useDiagram, useSettings, useLayout, useSelect, useWaypointEditor } from "../../hooks";
 import { useTranslation } from "react-i18next";
 import { SideSheet } from "@douyinfe/semi-ui";
 import RelationshipInfo from "../EditorSidePanel/RelationshipsTab/RelationshipInfo";
@@ -25,6 +25,11 @@ import {
   DefaultNotation,
 } from "./RelationshipFormat";
 import { subDT, subDP, subOT, subOP } from "./subtypeFormats";
+import { getConnectionPoints } from "../../utils/perimeter";
+import {
+  calculateOrthogonalPath,
+  getFieldPerimeterPoints,
+} from "../../utils/perimeterPoints";
 
 const labelFontSize = 16;
 
@@ -34,7 +39,7 @@ export default function Relationship({
   onContextMenu,
 }) {
   const { settings } = useSettings();
-  const { tables } = useDiagram();
+  const { tables, updateRelationshipWaypoints } = useDiagram();
   const { layout } = useLayout();
   const { selectedElement, setSelectedElement } = useSelect();
   const { t } = useTranslation();
@@ -192,6 +197,51 @@ export default function Relationship({
       isHorizontal,
     };
   }, [data.startTableId, data.endTableIds, data.subtype, tables]); // Dependencies for memoization
+
+  // Waypoint editor hook - always call hook but may not be active for subtype relationships
+  const shouldUseWaypoints = !data.subtype && startTable && endTable;
+  const waypointsData = useWaypointEditor(
+    shouldUseWaypoints ? data : null,
+    tables,
+    (updatedWaypoints) => {
+      if (shouldUseWaypoints) {
+        updateRelationshipWaypoints(data.id, updatedWaypoints);
+      }
+    }
+  );
+
+  const {
+    waypoints = [],
+    isDragging = false,
+    showWaypoints = false,
+    setShowWaypoints = () => {},
+    handlers = {},
+  } = (shouldUseWaypoints && waypointsData) ? waypointsData : {};
+
+  // Show waypoints when relationship is selected
+  useEffect(() => {
+    if (!shouldUseWaypoints) return;
+
+    const isSelected =
+      selectedElement.element === ObjectType.RELATIONSHIP &&
+      selectedElement.id === data.id;
+    setShowWaypoints(isSelected);
+  }, [selectedElement, data.id, setShowWaypoints, shouldUseWaypoints]);
+
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    if (!shouldUseWaypoints || !isDragging) return;
+
+    if (handlers.onMouseMove && handlers.onMouseUp) {
+      document.addEventListener("mousemove", handlers.onMouseMove);
+      document.addEventListener("mouseup", handlers.onMouseUp);
+
+      return () => {
+        document.removeEventListener("mousemove", handlers.onMouseMove);
+        document.removeEventListener("mouseup", handlers.onMouseUp);
+      };
+    }
+  }, [isDragging, handlers, shouldUseWaypoints]);
 
   try {
     if (data.subtype && settings.notation === Notation.DEFAULT) {
@@ -748,6 +798,62 @@ export default function Relationship({
       };
     }
 
+    // Calculate path - use orthogonal routing with stored connection points
+    let pathString;
+    let actualStartPoint = null;
+    let actualEndPoint = null;
+
+    // Check if relationship has stored connection points
+    if (data.startPoint && data.endPoint && startTable && endTable) {
+      // Recalculate actual positions based on current table positions
+      const hasColorStrip = settings.notation === Notation.DEFAULT;
+
+      // Recalculate start point based on stored side and fieldIndex
+      const startFieldPerimeter = getFieldPerimeterPoints(
+        startTable,
+        data.startPoint.fieldIndex,
+        startTable.fields.length,
+        hasColorStrip
+      );
+      actualStartPoint = startFieldPerimeter[data.startPoint.side] || startFieldPerimeter.right;
+
+      // Recalculate end point based on stored side and fieldIndex
+      const endFieldPerimeter = getFieldPerimeterPoints(
+        endTable,
+        data.endPoint.fieldIndex || 0,
+        endTable.fields.length,
+        hasColorStrip
+      );
+      actualEndPoint = endFieldPerimeter[data.endPoint.side] || endFieldPerimeter.left;
+
+      // Use orthogonal routing with recalculated points and table bounds
+      pathString = calculateOrthogonalPath(
+        actualStartPoint,
+        actualEndPoint,
+        waypoints || []
+      );
+    } else if (shouldUseWaypoints && waypoints && waypoints.length > 0) {
+      // Fallback: Use perimeter-based connection with waypoints
+      const { startPoint, endPoint } = getConnectionPoints(
+        startTable,
+        endTable,
+        waypoints
+      );
+
+      actualStartPoint = startPoint;
+      actualEndPoint = endPoint;
+
+      // Build orthogonal path through waypoints
+      pathString = calculateOrthogonalPath(startPoint, endPoint, waypoints);
+    } else {
+      // Fallback: Use original calcPath for backward compatibility
+      pathString = calcPath(
+        pathData,
+        startTable?.width || settings.tableWidth,
+        endTable?.width || settings.tableWidth,
+      );
+    }
+
     return (
       <>
         <g
@@ -757,7 +863,7 @@ export default function Relationship({
         >
           {/* Invisible path for larger hit area */}
           <path
-            d={calcPath(
+            d={shouldUseWaypoints && waypoints && waypoints.length > 0 ? pathString : calcPath(
               pathData,
               startTable?.width || settings.tableWidth,
               endTable?.width || settings.tableWidth,
@@ -771,16 +877,12 @@ export default function Relationship({
           {/* Visible path */}
           <path
             ref={pathRef}
-            d={calcPath(
-              pathData, // Use pathData which includes the field offsets
-              startTable?.width || settings.tableWidth,
-              endTable?.width || settings.tableWidth,
-            )}
-            stroke="gray"
-            className="group-hover:stroke-sky-700"
+            d={pathString}
+            stroke={showWaypoints ? (theme === "dark" ? "#60a5fa" : "#3b82f6") : "gray"}
+            className={showWaypoints ? "" : "group-hover:stroke-sky-700"}
             fill="none"
             strokeDasharray={relationshipType}
-            strokeWidth={2}
+            strokeWidth={showWaypoints ? 2.5 : 2}
           />
           {/* Show parent/child notations for all relationships */}
           {parentFormat && !data.subtype &&
@@ -937,6 +1039,7 @@ export default function Relationship({
                 </text>
               </>
             )}
+
         </g>
 
         <SideSheet
