@@ -33,6 +33,24 @@ import {
 
 const labelFontSize = 16;
 
+// Helper function to create simple orthogonal path between two points (shortest route)
+function createSimpleOrthogonalPath(start, end) {
+  if (!start || !end) return '';
+  
+  const dx = Math.abs(end.x - start.x);
+  const dy = Math.abs(end.y - start.y);
+  
+  // Determine if we should go horizontal-first or vertical-first
+  // Choose the dominant direction first
+  if (dx > dy) {
+    // Horizontal dominant: go horizontal first, then vertical
+    return `M ${start.x} ${start.y} L ${end.x} ${start.y} L ${end.x} ${end.y}`;
+  } else {
+    // Vertical dominant: go vertical first, then horizontal
+    return `M ${start.x} ${start.y} L ${start.x} ${end.y} L ${end.x} ${end.y}`;
+  }
+}
+
 export default function Relationship({
   data,
   onConnectSubtypePoint,
@@ -257,32 +275,48 @@ export default function Relationship({
         startTable,
         childTables,
         parentCenter,
+        childrenCenter,
         subtypePoint,
         isHorizontal,
       } = subtypeGeometry;
+      
+      // Calculate rotation angle in 90-degree increments based on direction to children
+      // The symbol should point towards the children (direction of specialization)
+      let notationAngle = 0;
+      if (isHorizontal) {
+        // Horizontal: check if children are to the right or left of subtype point
+        // Note: 0° makes lines point LEFT, 180° makes lines point RIGHT in the symbol design
+        notationAngle = childrenCenter.x > subtypePoint.x ? 180 : 0;
+      } else {
+        // Vertical: check if children are below or above subtype point
+        notationAngle = childrenCenter.y > subtypePoint.y ? 90 : -90;
+      }
+      
+      // Calculate orthogonal path from parent to subtype point (simple, shortest route)
+      const parentToSubtypePath = createSimpleOrthogonalPath(
+        parentCenter,
+        subtypePoint
+      );
+      
       return (
         <g className="group">
-          {/* Single line from parent to subtype point */}
-          <line
-            x1={parentCenter.x}
-            y1={parentCenter.y}
-            x2={subtypePoint.x}
-            y2={subtypePoint.y}
+          {/* Orthogonal path from parent to subtype point */}
+          <path
+            d={parentToSubtypePath}
             stroke={theme === darkBgTheme ? "#e5e7eb" : "#374151"}
             strokeWidth="1.5"
+            fill="none"
             onDoubleClick={edit}
             cursor="pointer"
             className="group-hover:stroke-sky-700"
             onContextMenu={handleContextMenu}
           />
-          {/* Invisible line for larger hit area */}
-          <line
-            x1={parentCenter.x}
-            y1={parentCenter.y}
-            x2={subtypePoint.x}
-            y2={subtypePoint.y}
+          {/* Invisible path for larger hit area */}
+          <path
+            d={parentToSubtypePath}
             stroke="transparent"
             strokeWidth="10"
+            fill="none"
             onDoubleClick={edit}
             cursor="pointer"
             onContextMenu={handleContextMenu}
@@ -291,7 +325,7 @@ export default function Relationship({
           {data.subtype_restriction === SubtypeRestriction.DISJOINT_TOTAL &&
             subDT(
               subtypePoint,
-              0, // angle
+              notationAngle, // Use calculated 90-degree angle
               settings.notation,
               SubtypeRestriction.DISJOINT_TOTAL,
               1, // direction
@@ -307,7 +341,7 @@ export default function Relationship({
           {data.subtype_restriction === SubtypeRestriction.DISJOINT_PARTIAL &&
             subDP(
               subtypePoint,
-              0,
+              notationAngle, // Use calculated 90-degree angle
               settings.notation,
               SubtypeRestriction.DISJOINT_PARTIAL,
               1,
@@ -323,7 +357,7 @@ export default function Relationship({
           {data.subtype_restriction === SubtypeRestriction.OVERLAPPING_TOTAL &&
             subOT(
               subtypePoint,
-              0,
+              notationAngle, // Use calculated 90-degree angle
               settings.notation,
               SubtypeRestriction.OVERLAPPING_TOTAL,
               1,
@@ -340,7 +374,7 @@ export default function Relationship({
             SubtypeRestriction.OVERLAPPING_PARTIAL &&
             subOP(
               subtypePoint,
-              0,
+              notationAngle, // Use calculated 90-degree angle
               settings.notation,
               SubtypeRestriction.OVERLAPPING_PARTIAL,
               1,
@@ -353,62 +387,69 @@ export default function Relationship({
               settings.tableWidth,
               handleContextMenu, // onContextMenu
             )}
-          {/* Lines from subtype horizontal line to each child */}
+          {/* Orthogonal paths from subtype notation to each child */}
           {childTables.map((childTable, index) => {
             const childCenter = {
               x: childTable.x + childTable.width / 2,
               y: childTable.y + childTable.height / 2,
             };
             // Calculate the connection point based on relationship orientation
-            let connectionPointX, connectionPointY;
+            let connectionPoint;
             if (isHorizontal) {
               // For horizontal relationships: connect from the right side of the notation
               if (
                 data.subtype_restriction === SubtypeRestriction.DISJOINT_TOTAL
               ) {
-                connectionPointX = subtypePoint.x + (index % 2 === 0 ? 20 : 25);
+                connectionPoint = {
+                  x: subtypePoint.x + (index % 2 === 0 ? 20 : 25),
+                  y: subtypePoint.y
+                };
               } else {
-                connectionPointX = subtypePoint.x + 20;
+                connectionPoint = {
+                  x: subtypePoint.x + 20,
+                  y: subtypePoint.y
+                };
               }
-              connectionPointY = subtypePoint.y;
             } else {
               // For vertical relationships: connect from the bottom of the notation
-              connectionPointX = subtypePoint.x;
-              connectionPointY = subtypePoint.y + 20;
+              connectionPoint = {
+                x: subtypePoint.x,
+                y: subtypePoint.y + 20
+              };
             }
 
-            // Calculate cardinality position for each child
-            const lineLength = Math.sqrt(
-              Math.pow(childCenter.x - connectionPointX, 2) +
-              Math.pow(childCenter.y - connectionPointY, 2)
+            // Calculate simple orthogonal path from subtype point to child center (shortest route)
+            const subtypeToChildPath = createSimpleOrthogonalPath(
+              connectionPoint,
+              childCenter
             );
+
+            // Create a temporary SVG path element to calculate cardinality position
+            const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            tempPath.setAttribute("d", subtypeToChildPath);
+            const pathLength = tempPath.getTotalLength();
             const cardinalityOffset = 30;
-            const cardinalityRatio = Math.min(cardinalityOffset / lineLength, 0.8);
-            const cardinalityX = connectionPointX + (childCenter.x - connectionPointX) * (1 - cardinalityRatio);
-            const cardinalityY = connectionPointY + (childCenter.y - connectionPointY) * (1 - cardinalityRatio);
+            const cardinalityPoint = tempPath.getPointAtLength(Math.max(0, pathLength - cardinalityOffset));
 
             return (
               <g key={`child-group-${data.id}-${index}`}>
-                <line
-                  x1={connectionPointX}
-                  y1={connectionPointY}
-                  x2={childCenter.x}
-                  y2={childCenter.y}
+                {/* Orthogonal path to child */}
+                <path
+                  d={subtypeToChildPath}
                   stroke={theme === darkBgTheme ? "#e5e7eb" : "#374151"}
                   strokeWidth="1.5"
+                  fill="none"
                   onDoubleClick={edit}
                   cursor="pointer"
                   className="group-hover:stroke-sky-700"
                   onContextMenu={handleContextMenu}
                 />
-                {/* Invisible line for larger hit area */}
-                <line
-                  x1={connectionPointX}
-                  y1={connectionPointY}
-                  x2={childCenter.x}
-                  y2={childCenter.y}
+                {/* Invisible path for larger hit area */}
+                <path
+                  d={subtypeToChildPath}
                   stroke="transparent"
                   strokeWidth="10"
+                  fill="none"
                   onDoubleClick={edit}
                   cursor="pointer"
                   onContextMenu={handleContextMenu}
@@ -416,8 +457,8 @@ export default function Relationship({
                 {/* Show (0,1) cardinality near each child table */}
                 {settings.showCardinality && (
                   <text
-                    x={cardinalityX}
-                    y={cardinalityY}
+                    x={cardinalityPoint.x}
+                    y={cardinalityPoint.y}
                     fill={theme === "dark" ? "lightgrey" : "#333"}
                     fontSize={12}
                     fontWeight={400}
@@ -895,6 +936,7 @@ export default function Relationship({
             )}
           {settings.notation === "default" &&
             settings.showCardinality &&
+            !data.subtype &&
             childFormat &&
             childFormat(
               pathRef,
@@ -910,6 +952,7 @@ export default function Relationship({
               vectorInfo, // Pass vector information
             )}
           {settings.notation !== "default" &&
+            !data.subtype &&
             childFormat &&
             childFormat(
               pathRef,
