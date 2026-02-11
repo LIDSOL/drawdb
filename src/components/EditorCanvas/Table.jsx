@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../data/datatypes";
 import { isRtl } from "../../i18n/utils/rtl";
 import i18n from "../../i18n/i18n";
+import { getAllTablePerimeterPoints } from "../../utils/perimeterPoints";
 
 //Helper function to calculate text width
 const getTextWidth = (text, font) => {
@@ -44,6 +45,7 @@ export default function Table(props) {
     moving,
     onContextMenu,
     onFieldContextMenu,
+    isLinking = false, // New prop to know when linking is active
   } = props;
   const { layout } = useLayout();
   const { deleteTable, deleteField } = useDiagram();
@@ -219,22 +221,8 @@ export default function Table(props) {
         // width={settings.tableWidth}
         width={tableData.width || settings.tableWidth}
         height={height}
-        className="group drop-shadow-lg  cursor-move"
-        onPointerDown={onPointerDown}
-        onPointerEnter={(e) => {
-          if (!e.isPrimary) return;
-          setHoveredTable({
-            tableId: tableData.id,
-            field: -2,
-          });
-        }}
-        onPointerLeave={(e) => {
-          if (!e.isPrimary) return;
-          setHoveredTable({
-            tableId: -1,
-            field: -2,
-          });
-        }}
+        className="group drop-shadow-lg"
+        style={{ pointerEvents: 'none' }}
       >
         <div
           onDoubleClick={openEditor}
@@ -252,15 +240,18 @@ export default function Table(props) {
                   ? "border-none"
                   : "border-2 border-zinc-500 rounded-lg hover:border-dashed hover:border-blue-500"
           }`}
-          style={{ direction: "ltr" }}
+          style={{ direction: 'ltr' }}
         >
           <div
             className={`h-[10px] w-full ${
               settings.notation !== Notation.DEFAULT ? "" : "rounded-t-md"
             }`}
+            onPointerDown={onPointerDown}
             style={{
               backgroundColor: tableData.color,
               height: settings.notation !== Notation.DEFAULT ? 0 : "10px",
+              pointerEvents: 'auto',
+              cursor: 'move'
             }}
           />
           <div
@@ -271,6 +262,7 @@ export default function Table(props) {
                   ? "bg-zinc-200"
                   : "bg-zinc-900"
             }`}
+            style={{ pointerEvents: 'none' }}
             onContextMenu={handleTableContextMenu}
           >
             <div
@@ -280,7 +272,15 @@ export default function Table(props) {
             >
               {tableData.name}
             </div>
-            <div className="hidden group-hover:block">
+            <div 
+              className={
+                selectedElement.element === ObjectType.TABLE &&
+                selectedElement.id === tableData.id
+                  ? "block"
+                  : "hidden"
+              }
+              style={{ pointerEvents: 'auto' }}
+            >
               <div className="flex justify-end items-center mx-2">
                 <Button
                   icon={<IconEdit />}
@@ -447,6 +447,36 @@ export default function Table(props) {
           })}
         </div>
       </foreignObject>
+
+      {/* Perimeter connection points (shown when linking) */}
+      {isLinking && (() => {
+        const hasColorStrip = settings.notation === Notation.DEFAULT;
+        const perimeterPoints = getAllTablePerimeterPoints(tableData, hasColorStrip);
+
+        return perimeterPoints.map((point, idx) => (
+          <g key={`perimeter-${tableData.id}-${idx}`}>
+            {/* Outer ring for visibility */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="8"
+              fill="rgba(59, 130, 246, 0.2)"
+              stroke="#3b82f6"
+              strokeWidth="2"
+              className="pointer-events-none"
+            />
+            {/* Inner dot */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="#3b82f6"
+              className="pointer-events-none"
+            />
+          </g>
+        ));
+      })()}
+
       <SideSheet
         title={t("edit")}
         size="small"
@@ -533,6 +563,7 @@ export default function Table(props) {
               ? "rounded-b-md"
               : ""
           } group h-[36px] px-2 py-1 flex justify-between items-center gap-1 w-full overflow-hidden`}
+        style={{ pointerEvents: 'auto', cursor: 'move' }}
         data-field-area="true"
         onPointerEnter={(e) => {
           if (!e.isPrimary) return;
@@ -549,6 +580,8 @@ export default function Table(props) {
           setHoveredField(-1);
         }}
         onPointerDown={(e) => {
+          // Call the table's onPointerDown handler for dragging
+          onPointerDown(e);
           // Required for onPointerLeave to trigger when a touch pointer leaves
           // https://stackoverflow.com/a/70976017/1137077
           e.target.releasePointerCapture(e.pointerId);

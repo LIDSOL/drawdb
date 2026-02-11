@@ -1,4 +1,5 @@
 // Helper function to calculate angle for subtype notation based on parent-child relationship
+// Returns angles in 90-degree increments (0, 90, 180, 270) for cleaner visual appearance
 function calculateSubtypeAngle(
   parentTable,
   childTable,
@@ -19,14 +20,20 @@ function calculateSubtypeAngle(
   const dx = parentCenter.x - subtypePoint.x;
   const dy = parentCenter.y - subtypePoint.y;
 
-  // Calculate angle in degrees (Math.atan2 returns radians)
-  let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-  // The notation is designed so that:
-  // - The lines/bars extend to the right (positive X direction)
-  // - The connection point for new subtypes is below (positive Y direction)
-  // We want the circle to face toward the parent, so we rotate to point the
-  // right-side elements (lines/bars) toward the parent
-  return angle;
+  // Determine if relationship is primarily horizontal or vertical
+  const isHorizontal = Math.abs(dx) > Math.abs(dy);
+  
+  // Return angle in 90-degree increments based on orientation
+  // The symbol should point AWAY from parent (towards children)
+  // Note: The symbol design has 0° pointing LEFT and 180° pointing RIGHT
+  if (isHorizontal) {
+    // Horizontal: if parent is to the left (dx < 0), children are to the right, so point right (180°)
+    // if parent is to the right (dx > 0), children are to the left, so point left (0°)
+    return dx < 0 ? 180 : 0;
+  } else {
+    // Vertical: if parent is above (dy > 0), point down (90°), if parent below, point up (-90°)
+    return dy > 0 ? 90 : -90;
+  }
 }
 
 export function subDT(

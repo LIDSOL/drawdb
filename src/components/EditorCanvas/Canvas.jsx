@@ -18,6 +18,7 @@ import { Toast, Modal, Input, InputNumber } from "@douyinfe/semi-ui";
 import Table from "./Table";
 import Area from "./Area";
 import Relationship from "./Relationship";
+import RelationshipControls from "./RelationshipControls";
 import Note from "./Note";
 import TableContextMenu from "./TableContextMenu";
 import RelationshipContextMenu from "./RelationshipContextMenu";
@@ -40,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { useEventListener } from "usehooks-ts";
 import { areFieldsCompatible } from "../../utils/utils";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getAllTablePerimeterPoints, findClosestPerimeterPoint, getFieldPerimeterPoints, calculateOrthogonalPath } from "../../utils/perimeterPoints";
 
 export default function Canvas() {
   const { t } = useTranslation();
@@ -96,6 +98,8 @@ export default function Canvas() {
     setRelationships,
     deleteField,
     removeChildFromSubtype,
+    adjustWaypointsForTableMove,
+    updateSubtypePerimeterPoints,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -111,6 +115,7 @@ export default function Canvas() {
     useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
+  
   const [dragging, setDragging] = useState({
     element: ObjectType.NONE,
     id: -1,
@@ -133,6 +138,8 @@ export default function Canvas() {
     startY: 0,
     endX: 0,
     endY: 0,
+    startPoint: null, // Perimeter point info: {x, y, side, fieldIndex}
+    previewEndPoint: null, // Preview point for mouse hover
   });
 
   // Estado para conexiones de jerarquía
@@ -145,6 +152,7 @@ export default function Canvas() {
     startY: 0,
     endX: 0,
     endY: 0,
+    selectedPerimeterPoint: null, // {x, y, side, fieldIndex} - punto perimetral seleccionado
   });
 
   const [grabOffset, setGrabOffset] = useState({ x: 0, y: 0 });
@@ -2250,11 +2258,40 @@ export default function Canvas() {
     }
 
     if (linking) {
-      setLinkingLine({
+      const updates = {
         ...linkingLine,
         endX: pointer.spaces.diagram.x,
         endY: pointer.spaces.diagram.y,
-      });
+      };
+
+      // If hovering over a table, calculate preview endpoint on perimeter
+      if (hoveredTable.tableId >= 0 && hoveredTable.fieldId >= 0) {
+        const targetTable = tables.find(t => t.id === hoveredTable.tableId);
+        if (targetTable) {
+          const hasColorStrip = settings.notation === Notation.DEFAULT;
+          const allPerimeterPoints = getAllTablePerimeterPoints(targetTable, hasColorStrip);
+
+          // Find closest perimeter point to mouse position
+          const closestPoint = findClosestPerimeterPoint(
+            allPerimeterPoints,
+            pointer.spaces.diagram.x,
+            pointer.spaces.diagram.y,
+            100 // threshold
+          );
+
+          if (closestPoint) {
+            updates.previewEndPoint = closestPoint;
+            updates.endTableId = hoveredTable.tableId;
+          } else {
+            updates.previewEndPoint = null;
+          }
+        }
+      } else {
+        updates.previewEndPoint = null;
+        updates.endTableId = -1;
+      }
+
+      setLinkingLine(updates);
     } else if (resizing.element === ObjectType.TABLE && resizing.id >= 0) {
       const table = tables.find((t) => t.id === resizing.id);
       const newWidth = Math.max(-(table.x - pointer.spaces.diagram.x), 180);
@@ -2262,11 +2299,22 @@ export default function Canvas() {
         width: newWidth,
       });
     } else if (hierarchyLinking) {
-      setHierarchyLinkingLine({
+      const updates = {
         ...hierarchyLinkingLine,
         endX: pointer.spaces.diagram.x,
         endY: pointer.spaces.diagram.y,
-      });
+        selectedPerimeterPoint: null, // Reset selection while moving
+      };
+
+      // If hovering over a table, keep endpoint at mouse position
+      // (perimeter points will be shown for clicking)
+      if (hoveredTable.tableId >= 0) {
+        updates.endTableId = hoveredTable.tableId;
+      } else {
+        updates.endTableId = -1;
+      }
+
+      setHierarchyLinkingLine(updates);
     } else if (
       panning.isPanning &&
       dragging.element === ObjectType.NONE &&
@@ -2686,6 +2734,28 @@ export default function Canvas() {
 
     if (coordsDidUpdate(dragging.element)) {
       const info = getMovedElementDetails();
+      
+      // Adjust waypoints for moved tables
+      if (dragging.element === ObjectType.TABLE) {
+        if (Array.isArray(dragging.id)) {
+          // Multiple tables moved - adjust waypoints for each
+          dragging.id.forEach((tableId) => {
+            const initPos = dragging.initialPositions[tableId];
+            const currentTable = tables.find(t => t.id === tableId);
+            if (initPos && currentTable) {
+              const deltaX = currentTable.x - initPos.x;
+              const deltaY = currentTable.y - initPos.y;
+              adjustWaypointsForTableMove(tableId, deltaX, deltaY);
+            }
+          });
+        } else {
+          // Single table moved
+          const deltaX = info.x - dragging.prevX;
+          const deltaY = info.y - dragging.prevY;
+          adjustWaypointsForTableMove(dragging.id, deltaX, deltaY);
+        }
+      }
+      
       // Use pushUndo to ensure centralized filtering/deduplication
       pushUndo(
         (() => {
@@ -2802,16 +2872,39 @@ export default function Canvas() {
     }
     setPanning((old) => ({ ...old, isPanning: false }));
     setDragging({ element: ObjectType.NONE, id: -1, prevX: 0, prevY: 0 });
+
+    // Calculate startPoint with perimeter information
+    const parentTable = tables.find((t) => t.id === fieldTableid);
+    let startPoint = null;
+
+    if (parentTable) {
+      const fieldIndex = parentTable.fields.findIndex(f => f.id === field.id);
+      const hasColorStrip = settings.notation === Notation.DEFAULT;
+
+      // Get perimeter points for this field
+      const fieldPerimeterPoints = getFieldPerimeterPoints(
+        parentTable,
+        fieldIndex,
+        parentTable.fields.length,
+        hasColorStrip
+      );
+
+      // Use the right side by default (common starting point)
+      startPoint = fieldPerimeterPoints.right;
+    }
+
     setLinkingLine({
       ...linkingLine,
       startTableId: fieldTableid,
       startFieldId: field.id,
-      startX: pointer.spaces.diagram.x,
-      startY: pointer.spaces.diagram.y,
-      endX: pointer.spaces.diagram.x,
-      endY: pointer.spaces.diagram.y,
+      startX: startPoint ? startPoint.x : pointer.spaces.diagram.x,
+      startY: startPoint ? startPoint.y : pointer.spaces.diagram.y,
+      endX: startPoint ? startPoint.x : pointer.spaces.diagram.x,
+      endY: startPoint ? startPoint.y : pointer.spaces.diagram.y,
       endTableId: -1,
       endFieldId: -1,
+      startPoint: startPoint,
+      previewEndPoint: null,
     });
     setLinking(true);
   };
@@ -2906,6 +2999,26 @@ export default function Canvas() {
       (f) => f.id === linkingLine.startFieldId,
     );
     const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : "table"}`;
+    
+    // Calculate perimeter points for start and end
+    const hasColorStrip = settings.notation === Notation.DEFAULT;
+    const startFieldIndex = parentTable.fields.findIndex(f => f.id === linkingLine.startFieldId);
+    const startPerimeterPoints = getFieldPerimeterPoints(
+      parentTable,
+      startFieldIndex,
+      parentTable.fields.length,
+      hasColorStrip
+    );
+    
+    // Get all perimeter points for end table to find closest one
+    const endTablePerimeterPoints = getAllTablePerimeterPoints(childTable, hasColorStrip);
+    const closestEndPoint = findClosestPerimeterPoint(
+      endTablePerimeterPoints,
+      linkingLine.endX,
+      linkingLine.endY,
+      50 // threshold
+    );
+    
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -2918,6 +3031,10 @@ export default function Canvas() {
       updateConstraint: Constraint.NONE,
       deleteConstraint: Constraint.NONE,
       name: relationshipName,
+      // Store perimeter connection points
+      startPoint: startPerimeterPoints.right, // Default to right side of start field
+      endPoint: closestEndPoint || endTablePerimeterPoints[0], // Use closest or first point
+      waypoints: [], // Initialize empty waypoints for orthogonal routing
     };
 
     delete newRelationship.startX;
@@ -2947,6 +3064,7 @@ export default function Canvas() {
       startY: hierarchyLineStartPoint.y,
       endX: hierarchyLineStartPoint.x,
       endY: hierarchyLineStartPoint.y,
+      selectedPerimeterPoint: null, // Initialize without selection
     });
     setHierarchyLinking(true);
   };
@@ -3009,6 +3127,30 @@ export default function Canvas() {
     }
     // Add the new child table to the existing subtype relationship
     addChildToSubtype(hierarchyLinkingLine.relationshipId, targetTableId);
+    
+    // If a perimeter point was selected, update the relationship
+    // Use setTimeout to ensure this happens after auto-initialization
+    if (hierarchyLinkingLine.selectedPerimeterPoint) {
+      setTimeout(() => {
+        const relationship = relationships.find(
+          (r) => r.id === hierarchyLinkingLine.relationshipId,
+        );
+        if (relationship && updateSubtypePerimeterPoints) {
+          const currentChildPoints = relationship.subtypePerimeterPoints?.childPoints || {};
+          updateSubtypePerimeterPoints(hierarchyLinkingLine.relationshipId, {
+            parentPoint: relationship.subtypePerimeterPoints?.parentPoint || {},
+            childPoints: {
+              ...currentChildPoints,
+              [targetTableId]: {
+                side: hierarchyLinkingLine.selectedPerimeterPoint.side,
+                fieldIndex: hierarchyLinkingLine.selectedPerimeterPoint.fieldIndex,
+              }
+            }
+          });
+        }
+      }, 50);
+    }
+    
     setHierarchyLinking(false);
     // Force a re-render to ensure UI updates properly
     setTimeout(() => {}, 100);
@@ -3165,14 +3307,16 @@ export default function Canvas() {
               }
               return true;
             })
-            .map((e, i) => (
-              <Relationship
-                key={e.id || i}
-                data={e}
-                onContextMenu={handleRelationshipContextMenu}
-                onConnectSubtypePoint={handleSubtypePointClick}
-              />
-            ))}
+            .map((e, i) => {
+              return (
+                <Relationship
+                  key={e.id || i}
+                  data={e}
+                  onContextMenu={handleRelationshipContextMenu}
+                  onConnectSubtypePoint={handleSubtypePointClick}
+                />
+              );
+            })}
           {tables.map((table) => {
             const isMoving =
               dragging.element === ObjectType.TABLE &&
@@ -3187,6 +3331,7 @@ export default function Canvas() {
                 setHoveredTable={setHoveredTable}
                 handleGripField={handleGripField}
                 setLinkingLine={setLinkingLine}
+                isLinking={linking}
                 onPointerDown={(e) =>
                   handlePointerDownOnElement(e, table.id, ObjectType.TABLE)
                 }
@@ -3195,6 +3340,132 @@ export default function Canvas() {
               />
             );
           })}
+          {/* Perimeter points durante hierarchy linking */}
+          {hierarchyLinking && (() => {
+            const originalRelationship = relationships.find(
+              (r) => r.id === hierarchyLinkingLine.relationshipId
+            );
+            if (!originalRelationship) return null;
+
+            const parentTable = tables.find(t => t.id === originalRelationship.startTableId);
+            if (!parentTable) return null;
+
+            const hasColorStrip = settings.notation === Notation.DEFAULT;
+            
+            // Mostrar puntos perimetrales de la tabla hovered (hijo potencial)
+            const hoveredTablePerimeters = hoveredTable.tableId >= 0 && (() => {
+              const targetTable = tables.find(t => t.id === hoveredTable.tableId);
+              if (!targetTable) return null;
+
+              const perimeterPoints = getAllTablePerimeterPoints(targetTable, hasColorStrip);
+
+              const handlePerimeterPointClick = (e, point) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // Update the hierarchy linking line with the selected point
+                setHierarchyLinkingLine(prev => ({
+                  ...prev,
+                  selectedPerimeterPoint: {
+                    x: point.x,
+                    y: point.y,
+                    side: point.side,
+                    fieldIndex: point.fieldIndex
+                  },
+                  endX: point.x,
+                  endY: point.y
+                }));
+                
+                // Complete the hierarchy linking
+                handleHierarchyLinking();
+              };
+
+              return (
+                <g className="hierarchy-perimeter-points-child">
+                  {perimeterPoints.map((point, idx) => {
+                    if (!point) return null;
+
+                    const isSelected = hierarchyLinkingLine.selectedPerimeterPoint &&
+                      hierarchyLinkingLine.selectedPerimeterPoint.side === point.side &&
+                      hierarchyLinkingLine.selectedPerimeterPoint.fieldIndex === point.fieldIndex;
+
+                    return (
+                      <g key={`hierarchy-child-perimeter-${idx}`}>
+                        <circle
+                          cx={point.x}
+                          cy={point.y}
+                          r={isSelected ? 9 : 7}
+                          fill={isSelected ? "rgba(59, 130, 246, 0.3)" : "rgba(156, 163, 175, 0.1)"}
+                          stroke={isSelected ? "#3b82f6" : "#9ca3af"}
+                          strokeWidth={isSelected ? 3 : 2}
+                          style={{ cursor: 'pointer' }}
+                          onMouseDown={(e) => handlePerimeterPointClick(e, point)}
+                          onClick={(e) => handlePerimeterPointClick(e, point)}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })();
+
+            // Mostrar puntos perimetrales de la tabla padre si no tiene punto asignado aún
+            const parentTablePerimeters = (!originalRelationship.subtypePerimeterPoints || 
+              !originalRelationship.subtypePerimeterPoints.parentPoint) && (() => {
+              
+              const parentPerimeterPoints = getAllTablePerimeterPoints(parentTable, hasColorStrip);
+
+              const handleParentPerimeterClick = (e, point) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // Update the parent perimeter point
+                if (updateSubtypePerimeterPoints) {
+                  const currentChildPoints = originalRelationship.subtypePerimeterPoints?.childPoints || {};
+                  updateSubtypePerimeterPoints(hierarchyLinkingLine.relationshipId, {
+                    parentPoint: {
+                      side: point.side,
+                      fieldIndex: point.fieldIndex
+                    },
+                    childPoints: currentChildPoints
+                  });
+                  
+                  Toast.success(t("parent_perimeter_point_set") || "Punto perimetral padre establecido");
+                }
+              };
+
+              return (
+                <g className="hierarchy-perimeter-points-parent">
+                  {parentPerimeterPoints.map((point, idx) => {
+                    if (!point) return null;
+
+                    return (
+                      <g key={`hierarchy-parent-perimeter-${idx}`}>
+                        <circle
+                          cx={point.x}
+                          cy={point.y}
+                          r={7}
+                          fill="rgba(239, 68, 68, 0.1)"
+                          stroke="#ef4444"
+                          strokeWidth={2}
+                          style={{ cursor: 'pointer' }}
+                          onMouseDown={(e) => handleParentPerimeterClick(e, point)}
+                          onClick={(e) => handleParentPerimeterClick(e, point)}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })();
+
+            return (
+              <>
+                {hoveredTablePerimeters}
+                {parentTablePerimeters}
+              </>
+            );
+          })()}
           {
             /*Draw the selection areas*/
             isAreaSelecting && isDrawingSelectionArea && (
@@ -3209,7 +3480,33 @@ export default function Canvas() {
               />
             )
           }
-          {linking && (
+          {linking && linkingLine.startPoint && (
+            <path
+              d={(() => {
+                // If we have both start and preview end points, use orthogonal routing
+                if (linkingLine.previewEndPoint) {
+                  const startTable = tables.find(t => t.id === linkingLine.startTableId);
+                  const endTable = tables.find(t => t.id === linkingLine.endTableId);
+
+                  if (startTable && endTable) {
+                    return calculateOrthogonalPath(
+                      linkingLine.startPoint,
+                      linkingLine.previewEndPoint,
+                      []
+                    );
+                  }
+                }
+                // Fallback to simple line
+                return `M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`;
+              })()}
+              stroke="#3b82f6"
+              strokeDasharray="8,8"
+              strokeWidth="2"
+              fill="none"
+              className="pointer-events-none touch-none"
+            />
+          )}
+          {linking && !linkingLine.startPoint && (
             <path
               d={`M ${linkingLine.startX} ${linkingLine.startY} L ${linkingLine.endX} ${linkingLine.endY}`}
               stroke="red"
@@ -3236,6 +3533,45 @@ export default function Canvas() {
               onContextMenu={handleNoteContextMenu}
             />
           ))}
+          
+          {/* Render relationship controls (waypoints/handles) AFTER tables to ensure they're on top */}
+          {relationships
+            .filter((rel) => {
+              // Same filter logic as above
+              if (
+                rel.subtype &&
+                rel.endTableId !== undefined &&
+                !rel.endTableIds
+              ) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length > 1
+              ) {
+                return true;
+              }
+              if (!rel.subtype) {
+                return true;
+              }
+              if (
+                rel.subtype &&
+                rel.endTableIds &&
+                rel.endTableIds.length === 1
+              ) {
+                return true;
+              }
+              return true;
+            })
+            .map((e, i) => {
+              return (
+                <RelationshipControls
+                  key={`controls-${e.id || i}`}
+                  data={e}
+                />
+              );
+            })}
         </svg>
       </div>
       {settings.showDebugCoordinates && (
