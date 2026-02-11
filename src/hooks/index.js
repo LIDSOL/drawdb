@@ -13,3 +13,4 @@ export { default as useTypes } from "./useTypes";
 export { default as useUndoRedo } from "./useUndoRedo";
 export { default as useEnums } from "./useEnums";
 export { useWaypointEditor, useConnectionPoints } from "./useWaypoints";
+export { useSubtypeWaypoints } from "./useSubtypeWaypoints";

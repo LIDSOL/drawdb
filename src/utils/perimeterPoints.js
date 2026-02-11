@@ -29,7 +29,7 @@ export function getFieldPerimeterPoints(table, fieldIndex, totalFields, hasColor
   // Table bounds
   const tableLeft = table.x;
   const tableRight = table.x + table.width;
-  const tableTop = table.y + headerHeight;
+  const tableTop = table.y + headerHeight; // Top of first field (after header)
   const tableBottom = table.y + headerHeight + (totalFields * tableFieldHeight);
   const tableCenterX = table.x + (table.width / 2);
 

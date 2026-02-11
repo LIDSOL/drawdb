@@ -99,6 +99,7 @@ export default function Canvas() {
     deleteField,
     removeChildFromSubtype,
     adjustWaypointsForTableMove,
+    updateSubtypePerimeterPoints,
   } = useDiagram();
   const { areas, updateArea, addArea, deleteArea } = useAreas();
   const { notes, updateNote, addNote, deleteNote } = useNotes();
@@ -151,6 +152,7 @@ export default function Canvas() {
     startY: 0,
     endX: 0,
     endY: 0,
+    selectedPerimeterPoint: null, // {x, y, side, fieldIndex} - punto perimetral seleccionado
   });
 
   const [grabOffset, setGrabOffset] = useState({ x: 0, y: 0 });
@@ -2297,11 +2299,22 @@ export default function Canvas() {
         width: newWidth,
       });
     } else if (hierarchyLinking) {
-      setHierarchyLinkingLine({
+      const updates = {
         ...hierarchyLinkingLine,
         endX: pointer.spaces.diagram.x,
         endY: pointer.spaces.diagram.y,
-      });
+        selectedPerimeterPoint: null, // Reset selection while moving
+      };
+
+      // If hovering over a table, keep endpoint at mouse position
+      // (perimeter points will be shown for clicking)
+      if (hoveredTable.tableId >= 0) {
+        updates.endTableId = hoveredTable.tableId;
+      } else {
+        updates.endTableId = -1;
+      }
+
+      setHierarchyLinkingLine(updates);
     } else if (
       panning.isPanning &&
       dragging.element === ObjectType.NONE &&
@@ -3051,6 +3064,7 @@ export default function Canvas() {
       startY: hierarchyLineStartPoint.y,
       endX: hierarchyLineStartPoint.x,
       endY: hierarchyLineStartPoint.y,
+      selectedPerimeterPoint: null, // Initialize without selection
     });
     setHierarchyLinking(true);
   };
@@ -3113,6 +3127,30 @@ export default function Canvas() {
     }
     // Add the new child table to the existing subtype relationship
     addChildToSubtype(hierarchyLinkingLine.relationshipId, targetTableId);
+    
+    // If a perimeter point was selected, update the relationship
+    // Use setTimeout to ensure this happens after auto-initialization
+    if (hierarchyLinkingLine.selectedPerimeterPoint) {
+      setTimeout(() => {
+        const relationship = relationships.find(
+          (r) => r.id === hierarchyLinkingLine.relationshipId,
+        );
+        if (relationship && updateSubtypePerimeterPoints) {
+          const currentChildPoints = relationship.subtypePerimeterPoints?.childPoints || {};
+          updateSubtypePerimeterPoints(hierarchyLinkingLine.relationshipId, {
+            parentPoint: relationship.subtypePerimeterPoints?.parentPoint || {},
+            childPoints: {
+              ...currentChildPoints,
+              [targetTableId]: {
+                side: hierarchyLinkingLine.selectedPerimeterPoint.side,
+                fieldIndex: hierarchyLinkingLine.selectedPerimeterPoint.fieldIndex,
+              }
+            }
+          });
+        }
+      }, 50);
+    }
+    
     setHierarchyLinking(false);
     // Force a re-render to ensure UI updates properly
     setTimeout(() => {}, 100);
@@ -3302,6 +3340,132 @@ export default function Canvas() {
               />
             );
           })}
+          {/* Perimeter points durante hierarchy linking */}
+          {hierarchyLinking && (() => {
+            const originalRelationship = relationships.find(
+              (r) => r.id === hierarchyLinkingLine.relationshipId
+            );
+            if (!originalRelationship) return null;
+
+            const parentTable = tables.find(t => t.id === originalRelationship.startTableId);
+            if (!parentTable) return null;
+
+            const hasColorStrip = settings.notation === Notation.DEFAULT;
+            
+            // Mostrar puntos perimetrales de la tabla hovered (hijo potencial)
+            const hoveredTablePerimeters = hoveredTable.tableId >= 0 && (() => {
+              const targetTable = tables.find(t => t.id === hoveredTable.tableId);
+              if (!targetTable) return null;
+
+              const perimeterPoints = getAllTablePerimeterPoints(targetTable, hasColorStrip);
+
+              const handlePerimeterPointClick = (e, point) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // Update the hierarchy linking line with the selected point
+                setHierarchyLinkingLine(prev => ({
+                  ...prev,
+                  selectedPerimeterPoint: {
+                    x: point.x,
+                    y: point.y,
+                    side: point.side,
+                    fieldIndex: point.fieldIndex
+                  },
+                  endX: point.x,
+                  endY: point.y
+                }));
+                
+                // Complete the hierarchy linking
+                handleHierarchyLinking();
+              };
+
+              return (
+                <g className="hierarchy-perimeter-points-child">
+                  {perimeterPoints.map((point, idx) => {
+                    if (!point) return null;
+
+                    const isSelected = hierarchyLinkingLine.selectedPerimeterPoint &&
+                      hierarchyLinkingLine.selectedPerimeterPoint.side === point.side &&
+                      hierarchyLinkingLine.selectedPerimeterPoint.fieldIndex === point.fieldIndex;
+
+                    return (
+                      <g key={`hierarchy-child-perimeter-${idx}`}>
+                        <circle
+                          cx={point.x}
+                          cy={point.y}
+                          r={isSelected ? 9 : 7}
+                          fill={isSelected ? "rgba(59, 130, 246, 0.3)" : "rgba(156, 163, 175, 0.1)"}
+                          stroke={isSelected ? "#3b82f6" : "#9ca3af"}
+                          strokeWidth={isSelected ? 3 : 2}
+                          style={{ cursor: 'pointer' }}
+                          onMouseDown={(e) => handlePerimeterPointClick(e, point)}
+                          onClick={(e) => handlePerimeterPointClick(e, point)}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })();
+
+            // Mostrar puntos perimetrales de la tabla padre si no tiene punto asignado aún
+            const parentTablePerimeters = (!originalRelationship.subtypePerimeterPoints || 
+              !originalRelationship.subtypePerimeterPoints.parentPoint) && (() => {
+              
+              const parentPerimeterPoints = getAllTablePerimeterPoints(parentTable, hasColorStrip);
+
+              const handleParentPerimeterClick = (e, point) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // Update the parent perimeter point
+                if (updateSubtypePerimeterPoints) {
+                  const currentChildPoints = originalRelationship.subtypePerimeterPoints?.childPoints || {};
+                  updateSubtypePerimeterPoints(hierarchyLinkingLine.relationshipId, {
+                    parentPoint: {
+                      side: point.side,
+                      fieldIndex: point.fieldIndex
+                    },
+                    childPoints: currentChildPoints
+                  });
+                  
+                  Toast.success(t("parent_perimeter_point_set") || "Punto perimetral padre establecido");
+                }
+              };
+
+              return (
+                <g className="hierarchy-perimeter-points-parent">
+                  {parentPerimeterPoints.map((point, idx) => {
+                    if (!point) return null;
+
+                    return (
+                      <g key={`hierarchy-parent-perimeter-${idx}`}>
+                        <circle
+                          cx={point.x}
+                          cy={point.y}
+                          r={7}
+                          fill="rgba(239, 68, 68, 0.1)"
+                          stroke="#ef4444"
+                          strokeWidth={2}
+                          style={{ cursor: 'pointer' }}
+                          onMouseDown={(e) => handleParentPerimeterClick(e, point)}
+                          onClick={(e) => handleParentPerimeterClick(e, point)}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })();
+
+            return (
+              <>
+                {hoveredTablePerimeters}
+                {parentTablePerimeters}
+              </>
+            );
+          })()}
           {
             /*Draw the selection areas*/
             isAreaSelecting && isDrawingSelectionArea && (

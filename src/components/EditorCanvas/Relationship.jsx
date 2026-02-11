@@ -13,7 +13,7 @@ import {
   SubtypeRestriction,
 } from "../../data/constants";
 import { calcPath } from "../../utils/calcPath";
-import { useDiagram, useSettings, useLayout, useSelect, useWaypointEditor } from "../../hooks";
+import { useDiagram, useSettings, useLayout, useSelect, useWaypointEditor, useSubtypeWaypoints } from "../../hooks";
 import { useTranslation } from "react-i18next";
 import { SideSheet } from "@douyinfe/semi-ui";
 import RelationshipInfo from "../EditorSidePanel/RelationshipsTab/RelationshipInfo";
@@ -29,6 +29,8 @@ import { getConnectionPoints } from "../../utils/perimeter";
 import {
   calculateOrthogonalPath,
   getFieldPerimeterPoints,
+  getAllTablePerimeterPoints,
+  findClosestPerimeterPoint,
 } from "../../utils/perimeterPoints";
 
 const labelFontSize = 16;
@@ -36,10 +38,10 @@ const labelFontSize = 16;
 // Helper function to create simple orthogonal path between two points (shortest route)
 function createSimpleOrthogonalPath(start, end) {
   if (!start || !end) return '';
-  
+
   const dx = Math.abs(end.x - start.x);
   const dy = Math.abs(end.y - start.y);
-  
+
   // Determine if we should go horizontal-first or vertical-first
   // Choose the dominant direction first
   if (dx > dy) {
@@ -57,7 +59,7 @@ export default function Relationship({
   onContextMenu,
 }) {
   const { settings } = useSettings();
-  const { tables, updateRelationshipWaypoints } = useDiagram();
+  const { tables, updateRelationshipWaypoints, updateSubtypeWaypoints, updateSubtypePerimeterPoints } = useDiagram();
   const { layout } = useLayout();
   const { selectedElement, setSelectedElement } = useSelect();
   const { t } = useTranslation();
@@ -122,6 +124,7 @@ export default function Relationship({
     if (!data.subtype || !data.endTableIds || data.endTableIds.length <= 1) {
       return null;
     }
+    console.log('📐 Recalculating subtypeGeometry for endTableIds:', data.endTableIds);
     const startTable = tables[data.startTableId];
     if (!startTable) {
       console.error("Start table not found for multi-child subtype", {
@@ -216,8 +219,9 @@ export default function Relationship({
     };
   }, [data.startTableId, data.endTableIds, data.subtype, tables]); // Dependencies for memoization
 
-  // Waypoint editor hook - always call hook but may not be active for subtype relationships
-  const shouldUseWaypoints = !data.subtype && startTable && endTable;
+  // Waypoint editor hook - enable for non-subtype and single-child subtype relationships
+  const isSingleChildSubtype = data.subtype && (!data.endTableIds || data.endTableIds.length <= 1);
+  const shouldUseWaypoints = (isSingleChildSubtype || !data.subtype) && startTable && endTable;
   const waypointsData = useWaypointEditor(
     shouldUseWaypoints ? data : null,
     tables,
@@ -261,6 +265,217 @@ export default function Relationship({
     }
   }, [isDragging, handlers, shouldUseWaypoints]);
 
+  // Subtype waypoints hook for multi-child relationships
+  const isMultiChildSubtype = data.subtype && data.endTableIds && data.endTableIds.length > 1;
+  const subtypeWaypointsData = useSubtypeWaypoints(
+    isMultiChildSubtype ? data : null,
+    tables,
+    (updatedWaypoints) => {
+      if (isMultiChildSubtype && updateSubtypeWaypoints) {
+        updateSubtypeWaypoints(data.id, updatedWaypoints);
+      }
+    }
+  );
+
+  const {
+    parentWaypoints = [],
+    childWaypoints = {},
+    showWaypoints: showSubtypeWaypoints = false,
+    setShowWaypoints: setShowSubtypeWaypoints = () => {},
+    isDragging: isSubtypeDragging = false,
+    handlers: subtypeHandlers = {},
+  } = isMultiChildSubtype && subtypeWaypointsData ? subtypeWaypointsData : {};
+
+  // Initialize waypoints for multi-child subtype relationships
+  useEffect(() => {
+    if (!isMultiChildSubtype || !subtypeGeometry || !updateSubtypeWaypoints) return;
+
+    const { childTables, parentCenter, subtypePoint } = subtypeGeometry;
+    
+    // If no waypoints exist at all, create everything from scratch
+    if (!data.subtypeWaypoints) {
+      const midX = (parentCenter.x + subtypePoint.x) / 2;
+      const midY = (parentCenter.y + subtypePoint.y) / 2;
+      
+      const initialChildWaypoints = {};
+      childTables.forEach(child => {
+        const childCenter = {
+          x: child.x + child.width / 2,
+          y: child.y + child.height / 2,
+        };
+        const childMidX = (subtypePoint.x + childCenter.x) / 2;
+        const childMidY = (subtypePoint.y + childCenter.y) / 2;
+        initialChildWaypoints[child.id] = [{ x: childMidX, y: childMidY }];
+      });
+
+      updateSubtypeWaypoints(data.id, {
+        parentToSubtype: [{ x: midX, y: midY }],
+        subtypeToChildren: initialChildWaypoints,
+      });
+      return;
+    }
+
+    // If waypoints exist, check if there are new children without waypoints
+    const existingChildWaypoints = data.subtypeWaypoints.subtypeToChildren || {};
+    const newChildren = childTables.filter(child => !existingChildWaypoints[child.id]);
+    
+    if (newChildren.length > 0) {
+      const updatedChildWaypoints = { ...existingChildWaypoints };
+      
+      newChildren.forEach(child => {
+        const childCenter = {
+          x: child.x + child.width / 2,
+          y: child.y + child.height / 2,
+        };
+        const childMidX = (subtypePoint.x + childCenter.x) / 2;
+        const childMidY = (subtypePoint.y + childCenter.y) / 2;
+        updatedChildWaypoints[child.id] = [{ x: childMidX, y: childMidY }];
+      });
+
+      updateSubtypeWaypoints(data.id, {
+        parentToSubtype: data.subtypeWaypoints.parentToSubtype || [],
+        subtypeToChildren: updatedChildWaypoints,
+      });
+    }
+  }, [isMultiChildSubtype, data.subtypeWaypoints, subtypeGeometry, updateSubtypeWaypoints, data.id, data.endTableIds]);
+
+  // Initialize perimeter points for multi-child subtype relationships
+  useEffect(() => {
+    if (!isMultiChildSubtype || !subtypeGeometry || !updateSubtypePerimeterPoints) {
+      console.log('🚫 Perimeter points effect SKIPPED:', { isMultiChildSubtype, hasGeometry: !!subtypeGeometry, hasUpdater: !!updateSubtypePerimeterPoints });
+      return;
+    }
+
+    const { startTable, childTables } = subtypeGeometry;
+    const hasColorStrip = settings.notation === Notation.DEFAULT;
+
+    console.log('🔍 Perimeter points effect triggered');
+    console.log('Current childTables:', childTables.map(c => ({ id: c.id, name: c.name })));
+    console.log('Current subtypePerimeterPoints:', data.subtypePerimeterPoints);
+    console.log('data.endTableIds:', data.endTableIds);
+
+    // If no perimeter points exist at all, create default ones
+    if (!data.subtypePerimeterPoints) {
+      console.log('📝 Creating initial perimeter points for all children');
+      
+      // Use the same method as rendering to get all parent perimeter points
+      const allParentPoints = getAllTablePerimeterPoints(startTable, hasColorStrip);
+      
+      // Find the closest point to the subtype notation (or to children center)
+      const closestParentPoint = findClosestPerimeterPoint(
+        allParentPoints,
+        subtypeGeometry.subtypePoint.x,
+        subtypeGeometry.subtypePoint.y,
+        Infinity
+      );
+
+      // Create perimeter points for each child
+      const childPerimeterPoints = {};
+      childTables.forEach(child => {
+        // Use the same method as rendering to get all perimeter points
+        const allChildPoints = getAllTablePerimeterPoints(child, hasColorStrip);
+        
+        // Find the closest point to the subtype notation
+        const closestPoint = findClosestPerimeterPoint(
+          allChildPoints,
+          subtypeGeometry.subtypePoint.x,
+          subtypeGeometry.subtypePoint.y,
+          Infinity
+        );
+
+        if (closestPoint) {
+          childPerimeterPoints[child.id] = {
+            side: closestPoint.side,
+            fieldIndex: closestPoint.fieldIndex
+          };
+        } else {
+          console.warn('Could not find closest perimeter point for child:', child.name);
+        }
+      });
+
+      if (!closestParentPoint) {
+        console.error('Could not find closest perimeter point for parent table');
+        return;
+      }
+
+      updateSubtypePerimeterPoints(data.id, {
+        parentPoint: { side: closestParentPoint.side, fieldIndex: closestParentPoint.fieldIndex },
+        childPoints: childPerimeterPoints
+      });
+      return;
+    }
+
+    // If perimeter points exist, check if there are new children without perimeter points
+    const existingChildPoints = data.subtypePerimeterPoints.childPoints || {};
+    const newChildren = childTables.filter(child => !existingChildPoints[child.id]);
+    
+    console.log('📊 Checking for new children without perimeter points');
+    console.log('Existing child points:', existingChildPoints);
+    console.log('New children detected:', newChildren.map(c => ({ id: c.id, name: c.name })));
+    
+    if (newChildren.length > 0) {
+      console.log('➕ Adding perimeter points for new children');
+      const updatedChildPoints = { ...existingChildPoints };
+      
+      newChildren.forEach(child => {
+        // Use the same method as rendering to get all perimeter points
+        const allChildPoints = getAllTablePerimeterPoints(child, hasColorStrip);
+        
+        // Find the closest point to the subtype notation
+        const closestPoint = findClosestPerimeterPoint(
+          allChildPoints,
+          subtypeGeometry.subtypePoint.x,
+          subtypeGeometry.subtypePoint.y,
+          Infinity
+        );
+
+        if (closestPoint) {
+          updatedChildPoints[child.id] = {
+            side: closestPoint.side,
+            fieldIndex: closestPoint.fieldIndex
+          };
+        } else {
+          console.warn('Could not find closest perimeter point for new child:', child.name);
+        }
+      });
+
+      console.log('✅ Updated child points:', updatedChildPoints);
+
+      updateSubtypePerimeterPoints(data.id, {
+        parentPoint: data.subtypePerimeterPoints.parentPoint,
+        childPoints: updatedChildPoints
+      });
+    } else {
+      console.log('✔️ All children already have perimeter points');
+    }
+  }, [isMultiChildSubtype, data.subtypePerimeterPoints, subtypeGeometry, updateSubtypePerimeterPoints, data.id, settings.notation, data.endTableIds]);
+
+  // Show subtype waypoints when selected
+  useEffect(() => {
+    if (!isMultiChildSubtype) return;
+
+    const isSelected =
+      selectedElement.element === ObjectType.RELATIONSHIP &&
+      selectedElement.id === data.id;
+    
+    setShowSubtypeWaypoints(isSelected);
+  }, [selectedElement, data.id, isMultiChildSubtype]);
+
+  // Add global mouse event listeners for subtype waypoint dragging
+  useEffect(() => {
+    if (!isMultiChildSubtype || !isSubtypeDragging) return;
+
+    if (subtypeHandlers.onMouseMove && subtypeHandlers.onMouseUp) {
+      document.addEventListener("mousemove", subtypeHandlers.onMouseMove);
+      document.addEventListener("mouseup", subtypeHandlers.onMouseUp);
+
+      return () => {
+        document.removeEventListener("mousemove", subtypeHandlers.onMouseMove);
+        document.removeEventListener("mouseup", subtypeHandlers.onMouseUp);
+      };
+    }
+  }, [isSubtypeDragging, subtypeHandlers, isMultiChildSubtype]);
+
   try {
     if (data.subtype && settings.notation === Notation.DEFAULT) {
       return null;
@@ -280,6 +495,40 @@ export default function Relationship({
         isHorizontal,
       } = subtypeGeometry;
       
+      // Calculate actual perimeter points from stored data
+      const hasColorStrip = settings.notation === Notation.DEFAULT;
+      let actualParentPoint = parentCenter; // Default to center
+      const actualChildPoints = {}; // Store actual child points
+      
+      if (data.subtypePerimeterPoints && data.subtypePerimeterPoints.parentPoint) {
+        const parentPerim = getFieldPerimeterPoints(
+          startTable,
+          data.subtypePerimeterPoints.parentPoint.fieldIndex,
+          startTable.fields.length,
+          hasColorStrip
+        );
+        actualParentPoint = parentPerim[data.subtypePerimeterPoints.parentPoint.side] || parentCenter;
+      }
+      
+      // Calculate actual child perimeter points
+      childTables.forEach(childTable => {
+        const childCenter = {
+          x: childTable.x + childTable.width / 2,
+          y: childTable.y + childTable.height / 2,
+        };
+        actualChildPoints[childTable.id] = childCenter; // Default to center
+        
+        if (data.subtypePerimeterPoints && data.subtypePerimeterPoints.childPoints && data.subtypePerimeterPoints.childPoints[childTable.id]) {
+          const childPerim = getFieldPerimeterPoints(
+            childTable,
+            data.subtypePerimeterPoints.childPoints[childTable.id].fieldIndex,
+            childTable.fields.length,
+            hasColorStrip
+          );
+          actualChildPoints[childTable.id] = childPerim[data.subtypePerimeterPoints.childPoints[childTable.id].side] || childCenter;
+        }
+      });
+      
       // Calculate rotation angle in 90-degree increments based on direction to children
       // The symbol should point towards the children (direction of specialization)
       let notationAngle = 0;
@@ -292,10 +541,12 @@ export default function Relationship({
         notationAngle = childrenCenter.y > subtypePoint.y ? 90 : -90;
       }
       
-      // Calculate orthogonal path from parent to subtype point (simple, shortest route)
-      const parentToSubtypePath = createSimpleOrthogonalPath(
-        parentCenter,
-        subtypePoint
+      // Calculate orthogonal path from parent to subtype point
+      // Always use calculateOrthogonalPath for consistency (with or without waypoints)
+      const parentToSubtypePath = calculateOrthogonalPath(
+        actualParentPoint,
+        subtypePoint,
+        parentWaypoints // Empty array if no waypoints
       );
       
       return (
@@ -303,12 +554,16 @@ export default function Relationship({
           {/* Orthogonal path from parent to subtype point */}
           <path
             d={parentToSubtypePath}
-            stroke={theme === darkBgTheme ? "#e5e7eb" : "#374151"}
-            strokeWidth="1.5"
+            stroke={
+              showSubtypeWaypoints
+                ? (theme === "dark" ? "#60a5fa" : "#3b82f6")
+                : (theme === darkBgTheme ? "#e5e7eb" : "#374151")
+            }
+            strokeWidth={showSubtypeWaypoints ? 2.5 : 1.5}
             fill="none"
             onDoubleClick={edit}
             cursor="pointer"
-            className="group-hover:stroke-sky-700"
+            className={showSubtypeWaypoints ? "" : "group-hover:stroke-sky-700"}
             onContextMenu={handleContextMenu}
           />
           {/* Invisible path for larger hit area */}
@@ -393,35 +648,33 @@ export default function Relationship({
               x: childTable.x + childTable.width / 2,
               y: childTable.y + childTable.height / 2,
             };
-            // Calculate the connection point based on relationship orientation
-            let connectionPoint;
-            if (isHorizontal) {
-              // For horizontal relationships: connect from the right side of the notation
-              if (
-                data.subtype_restriction === SubtypeRestriction.DISJOINT_TOTAL
-              ) {
-                connectionPoint = {
-                  x: subtypePoint.x + (index % 2 === 0 ? 20 : 25),
-                  y: subtypePoint.y
-                };
-              } else {
-                connectionPoint = {
-                  x: subtypePoint.x + 20,
-                  y: subtypePoint.y
-                };
-              }
-            } else {
-              // For vertical relationships: connect from the bottom of the notation
-              connectionPoint = {
-                x: subtypePoint.x,
-                y: subtypePoint.y + 20
-              };
-            }
+            // Calculate the connection point: fixed distance from subtype notation towards child
+            // This works for all directions (right, left, below, above)
+            const dx = childCenter.x - subtypePoint.x;
+            const dy = childCenter.y - subtypePoint.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Distance from notation symbol to connection point
+            const notationOffset = data.subtype_restriction === SubtypeRestriction.DISJOINT_TOTAL
+              ? (index % 2 === 0 ? 35 : 40)
+              : 35;
+            
+            const connectionPoint = {
+              x: subtypePoint.x + (dx / distance) * notationOffset,
+              y: subtypePoint.y + (dy / distance) * notationOffset
+            };
 
-            // Calculate simple orthogonal path from subtype point to child center (shortest route)
-            const subtypeToChildPath = createSimpleOrthogonalPath(
+            // Get child ID and actual child perimeter point (already calculated above)
+            const childId = childTable.id;
+            const actualChildPoint = actualChildPoints[childId] || childCenter;
+
+            // Calculate orthogonal path from subtype point to child perimeter point
+            // Always use calculateOrthogonalPath for consistency (with or without waypoints)
+            const childSpecificWaypoints = childWaypoints[childId] || [];
+            const subtypeToChildPath = calculateOrthogonalPath(
               connectionPoint,
-              childCenter
+              actualChildPoint,
+              childSpecificWaypoints // Empty array if no waypoints
             );
 
             // Create a temporary SVG path element to calculate cardinality position
@@ -436,12 +689,16 @@ export default function Relationship({
                 {/* Orthogonal path to child */}
                 <path
                   d={subtypeToChildPath}
-                  stroke={theme === darkBgTheme ? "#e5e7eb" : "#374151"}
-                  strokeWidth="1.5"
+                  stroke={
+                    showSubtypeWaypoints
+                      ? (theme === "dark" ? "#60a5fa" : "#3b82f6")
+                      : (theme === darkBgTheme ? "#e5e7eb" : "#374151")
+                  }
+                  strokeWidth={showSubtypeWaypoints ? 2.5 : 1.5}
                   fill="none"
                   onDoubleClick={edit}
                   cursor="pointer"
-                  className="group-hover:stroke-sky-700"
+                  className={showSubtypeWaypoints ? "" : "group-hover:stroke-sky-700"}
                   onContextMenu={handleContextMenu}
                 />
                 {/* Invisible path for larger hit area */}
@@ -469,9 +726,43 @@ export default function Relationship({
                     {settings.notation === Notation.DEFAULT ? "(0,1)" : "(0,1)"}
                   </text>
                 )}
+                
+                {/* Render waypoints for this child if shown */}
+                {showSubtypeWaypoints && childSpecificWaypoints.map((waypoint, wpIndex) => (
+                  <g key={`child-waypoint-${childId}-${wpIndex}`}>
+                    <circle
+                      cx={waypoint.x}
+                      cy={waypoint.y}
+                      r="6"
+                      fill="#3b82f6"
+                      stroke="white"
+                      strokeWidth="2"
+                      cursor="move"
+                      onMouseDown={(e) => subtypeHandlers.onWaypointMouseDown?.(e, 'child', wpIndex, childId)}
+                      onDoubleClick={(e) => subtypeHandlers.onWaypointDoubleClick?.(e, 'child', wpIndex, childId)}
+                    />
+                  </g>
+                ))}
               </g>
             );
           })}
+
+          {/* Render waypoints for parent-to-subtype line if shown */}
+          {showSubtypeWaypoints && parentWaypoints.map((waypoint, wpIndex) => (
+            <g key={`parent-waypoint-${wpIndex}`}>
+              <circle
+                cx={waypoint.x}
+                cy={waypoint.y}
+                r="6"
+                fill="#3b82f6"
+                stroke="white"
+                strokeWidth="2"
+                cursor="move"
+                onMouseDown={(e) => subtypeHandlers.onWaypointMouseDown?.(e, 'parent', wpIndex)}
+                onDoubleClick={(e) => subtypeHandlers.onWaypointDoubleClick?.(e, 'parent', wpIndex)}
+              />
+            </g>
+          ))}
 
           {/* Label rendering for multi-child subtype relationships */}
           {settings.showRelationshipLabels &&

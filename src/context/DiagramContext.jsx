@@ -750,6 +750,16 @@ export default function DiagramContextProvider({ children }) {
     updateRelationship(id, { waypoints: waypoints || [] });
   };
 
+  // Update waypoints for subtype relationships (multi-child)
+  const updateSubtypeWaypoints = (id, subtypeWaypoints) => {
+    updateRelationship(id, { subtypeWaypoints: subtypeWaypoints || { parentToSubtype: [], subtypeToChildren: {} } });
+  };
+
+  // Update perimeter points for subtype relationships (multi-child)
+  const updateSubtypePerimeterPoints = (id, perimeterPoints) => {
+    updateRelationship(id, { subtypePerimeterPoints: perimeterPoints });
+  };
+
   // Adjust waypoints when a table moves
   const adjustWaypointsForTableMove = (tableId, deltaX, deltaY) => {
     // Update all relationships in a single state update
@@ -761,15 +771,50 @@ export default function DiagramContextProvider({ children }) {
           rel.endTableId === tableId ||
           (rel.endTableIds && rel.endTableIds.includes(tableId));
 
-        if (isConnected && rel.waypoints && rel.waypoints.length > 0) {
-          const adjustedWaypoints = rel.waypoints.map(waypoint => ({
+        if (!isConnected) return rel;
+
+        const updatedRel = { ...rel };
+
+        // Adjust regular waypoints
+        if (rel.waypoints && rel.waypoints.length > 0) {
+          updatedRel.waypoints = rel.waypoints.map(waypoint => ({
             x: waypoint.x + deltaX,
             y: waypoint.y + deltaY
           }));
-          return { ...rel, waypoints: adjustedWaypoints };
         }
 
-        return rel;
+        // Adjust subtype waypoints for multi-child relationships
+        if (rel.subtypeWaypoints) {
+          const adjustedSubtypeWaypoints = { ...rel.subtypeWaypoints };
+
+          // Adjust parent-to-subtype waypoints if parent table moved
+          if (rel.startTableId === tableId && adjustedSubtypeWaypoints.parentToSubtype) {
+            adjustedSubtypeWaypoints.parentToSubtype = adjustedSubtypeWaypoints.parentToSubtype.map(waypoint => ({
+              x: waypoint.x + deltaX,
+              y: waypoint.y + deltaY
+            }));
+          }
+
+          // Adjust child waypoints if any child table moved
+          if (rel.endTableIds && rel.endTableIds.includes(tableId) && adjustedSubtypeWaypoints.subtypeToChildren) {
+            adjustedSubtypeWaypoints.subtypeToChildren = Object.fromEntries(
+              Object.entries(adjustedSubtypeWaypoints.subtypeToChildren).map(([childId, waypoints]) => {
+                // Only adjust waypoints for the moved child table
+                if (parseInt(childId) === tableId) {
+                  return [childId, waypoints.map(waypoint => ({
+                    x: waypoint.x + deltaX,
+                    y: waypoint.y + deltaY
+                  }))];
+                }
+                return [childId, waypoints];
+              })
+            );
+          }
+
+          updatedRel.subtypeWaypoints = adjustedSubtypeWaypoints;
+        }
+
+        return updatedRel;
       });
     });
   };
@@ -1063,6 +1108,8 @@ export default function DiagramContextProvider({ children }) {
         deleteRelationship,
         updateRelationship,
         updateRelationshipWaypoints,
+        updateSubtypeWaypoints,
+        updateSubtypePerimeterPoints,
         adjustWaypointsForTableMove,
         addChildToSubtype,
         removeChildFromSubtype,
