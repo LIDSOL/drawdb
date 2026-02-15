@@ -6,13 +6,15 @@ import {
   TagInput,
   Checkbox,
   Toast,
+  Popover,
 } from "@douyinfe/semi-ui";
 import { Action, ObjectType } from "../../../data/constants";
 import { IconDeleteStroked } from "@douyinfe/semi-icons";
-import { useDiagram, useUndoRedo } from "../../../hooks";
+import { useDiagram, useUndoRedo, useSettings } from "../../../hooks";
 import { useTranslation } from "react-i18next";
 import { dbToTypes } from "../../../data/datatypes";
 import { databases } from "../../../data/databases";
+import ColorPicker from "../../ColorPicker";
 
 export default function FieldDetails({ data, tid, index }) {
   const { t } = useTranslation();
@@ -20,6 +22,7 @@ export default function FieldDetails({ data, tid, index }) {
   const { pushUndo } = useUndoRedo();
   const { updateField, deleteField } = useDiagram();
   const [editField, setEditField] = useState({});
+  const { settings } = useSettings();
 
   return (
     <div>
@@ -243,6 +246,62 @@ export default function FieldDetails({ data, tid, index }) {
             />
           </div>
         )}
+      {data.foreignK && (
+        <div className="my-3">
+          <div className="font-semibold mb-2">{t("foreign_key")} Color</div>
+          <Popover
+            content={
+              <div className="popover-theme">
+                <ColorPicker
+                  currentColor={data.fkColor || settings.defaultFkColor}
+                  onClearColor={() => {
+                    pushUndo({
+                      action: Action.EDIT,
+                      element: ObjectType.TABLE,
+                      component: "field",
+                      tid: tid,
+                      fid: index,
+                      undo: { fkColor: data.fkColor },
+                      redo: { fkColor: undefined },
+                      message: t("edit_table", {
+                        tableName: tables[tid].name,
+                        extra: "[field color]",
+                      }),
+                    });
+                    updateField(tid, index, { fkColor: undefined });
+                  }}
+                  onPickColor={(color) => {
+                    pushUndo({
+                      action: Action.EDIT,
+                      element: ObjectType.TABLE,
+                      component: "field",
+                      tid: tid,
+                      fid: index,
+                      undo: { fkColor: data.fkColor },
+                      redo: { fkColor: color },
+                      message: t("edit_table", {
+                        tableName: tables[tid].name,
+                        extra: "[field color]",
+                      }),
+                    });
+                    updateField(tid, index, { fkColor: color });
+                  }}
+                />
+              </div>
+            }
+            trigger="click"
+            position="bottomLeft"
+            showArrow
+          >
+            <div
+              className="w-full h-8 rounded border-2 border-gray-300 dark:border-gray-600 cursor-pointer hover:border-blue-500 transition-colors"
+              style={{
+                backgroundColor: data.fkColor || settings.defaultFkColor,
+              }}
+            />
+          </Popover>
+        </div>
+      )}
       <div className="font-semibold">{t("comment")}</div>
       <TextArea
         className="my-2"
