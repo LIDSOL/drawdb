@@ -291,12 +291,12 @@ export default function Relationship({
     if (!isMultiChildSubtype || !subtypeGeometry || !updateSubtypeWaypoints) return;
 
     const { childTables, parentCenter, subtypePoint } = subtypeGeometry;
-    
+
     // If no waypoints exist at all, create everything from scratch
     if (!data.subtypeWaypoints) {
       const midX = (parentCenter.x + subtypePoint.x) / 2;
       const midY = (parentCenter.y + subtypePoint.y) / 2;
-      
+
       const initialChildWaypoints = {};
       childTables.forEach(child => {
         const childCenter = {
@@ -318,10 +318,10 @@ export default function Relationship({
     // If waypoints exist, check if there are new children without waypoints
     const existingChildWaypoints = data.subtypeWaypoints.subtypeToChildren || {};
     const newChildren = childTables.filter(child => !existingChildWaypoints[child.id]);
-    
+
     if (newChildren.length > 0) {
       const updatedChildWaypoints = { ...existingChildWaypoints };
-      
+
       newChildren.forEach(child => {
         const childCenter = {
           x: child.x + child.width / 2,
@@ -342,25 +342,23 @@ export default function Relationship({
   // Initialize perimeter points for multi-child subtype relationships
   useEffect(() => {
     if (!isMultiChildSubtype || !subtypeGeometry || !updateSubtypePerimeterPoints) {
-      console.log('🚫 Perimeter points effect SKIPPED:', { isMultiChildSubtype, hasGeometry: !!subtypeGeometry, hasUpdater: !!updateSubtypePerimeterPoints });
+      console.log( 'Perimeter points effect SKIPPED:', { isMultiChildSubtype, hasGeometry: !!subtypeGeometry, hasUpdater: !!updateSubtypePerimeterPoints });
       return;
     }
 
     const { startTable, childTables } = subtypeGeometry;
     const hasColorStrip = settings.notation === Notation.DEFAULT;
 
-    console.log('🔍 Perimeter points effect triggered');
+    console.log(' Perimeter points effect triggered');
     console.log('Current childTables:', childTables.map(c => ({ id: c.id, name: c.name })));
     console.log('Current subtypePerimeterPoints:', data.subtypePerimeterPoints);
     console.log('data.endTableIds:', data.endTableIds);
 
     // If no perimeter points exist at all, create default ones
     if (!data.subtypePerimeterPoints) {
-      console.log('📝 Creating initial perimeter points for all children');
-      
+      console.log(' Creating initial perimeter points for all children');
       // Use the same method as rendering to get all parent perimeter points
       const allParentPoints = getAllTablePerimeterPoints(startTable, hasColorStrip);
-      
       // Find the closest point to the subtype notation (or to children center)
       const closestParentPoint = findClosestPerimeterPoint(
         allParentPoints,
@@ -374,7 +372,7 @@ export default function Relationship({
       childTables.forEach(child => {
         // Use the same method as rendering to get all perimeter points
         const allChildPoints = getAllTablePerimeterPoints(child, hasColorStrip);
-        
+
         // Find the closest point to the subtype notation
         const closestPoint = findClosestPerimeterPoint(
           allChildPoints,
@@ -408,19 +406,19 @@ export default function Relationship({
     // If perimeter points exist, check if there are new children without perimeter points
     const existingChildPoints = data.subtypePerimeterPoints.childPoints || {};
     const newChildren = childTables.filter(child => !existingChildPoints[child.id]);
-    
-    console.log('📊 Checking for new children without perimeter points');
+
+    console.log('Checking for new children without perimeter points');
     console.log('Existing child points:', existingChildPoints);
     console.log('New children detected:', newChildren.map(c => ({ id: c.id, name: c.name })));
-    
+
     if (newChildren.length > 0) {
-      console.log('➕ Adding perimeter points for new children');
+      console.log('Adding perimeter points for new children');
       const updatedChildPoints = { ...existingChildPoints };
-      
+
       newChildren.forEach(child => {
         // Use the same method as rendering to get all perimeter points
         const allChildPoints = getAllTablePerimeterPoints(child, hasColorStrip);
-        
+
         // Find the closest point to the subtype notation
         const closestPoint = findClosestPerimeterPoint(
           allChildPoints,
@@ -439,14 +437,14 @@ export default function Relationship({
         }
       });
 
-      console.log('✅ Updated child points:', updatedChildPoints);
+      console.log('Updated child points:', updatedChildPoints);
 
       updateSubtypePerimeterPoints(data.id, {
         parentPoint: data.subtypePerimeterPoints.parentPoint,
         childPoints: updatedChildPoints
       });
     } else {
-      console.log('✔️ All children already have perimeter points');
+      console.log('All children already have perimeter points');
     }
   }, [isMultiChildSubtype, data.subtypePerimeterPoints, subtypeGeometry, updateSubtypePerimeterPoints, data.id, settings.notation, data.endTableIds]);
 
@@ -457,7 +455,7 @@ export default function Relationship({
     const isSelected =
       selectedElement.element === ObjectType.RELATIONSHIP &&
       selectedElement.id === data.id;
-    
+
     setShowSubtypeWaypoints(isSelected);
   }, [selectedElement, data.id, isMultiChildSubtype]);
 
@@ -494,22 +492,30 @@ export default function Relationship({
         subtypePoint,
         isHorizontal,
       } = subtypeGeometry;
-      
+
       // Calculate actual perimeter points from stored data
       const hasColorStrip = settings.notation === Notation.DEFAULT;
       let actualParentPoint = parentCenter; // Default to center
       const actualChildPoints = {}; // Store actual child points
-      
+
       if (data.subtypePerimeterPoints && data.subtypePerimeterPoints.parentPoint) {
+        // Adjust fieldIndex for top/bottom sides
+        let parentFieldIndex = data.subtypePerimeterPoints.parentPoint.fieldIndex;
+        if (data.subtypePerimeterPoints.parentPoint.side === 'top') {
+          parentFieldIndex = 0;
+        } else if (data.subtypePerimeterPoints.parentPoint.side === 'bottom') {
+          parentFieldIndex = startTable.fields.length - 1;
+        }
+
         const parentPerim = getFieldPerimeterPoints(
           startTable,
-          data.subtypePerimeterPoints.parentPoint.fieldIndex,
+          parentFieldIndex,
           startTable.fields.length,
           hasColorStrip
         );
         actualParentPoint = parentPerim[data.subtypePerimeterPoints.parentPoint.side] || parentCenter;
       }
-      
+
       // Calculate actual child perimeter points
       childTables.forEach(childTable => {
         const childCenter = {
@@ -517,38 +523,42 @@ export default function Relationship({
           y: childTable.y + childTable.height / 2,
         };
         actualChildPoints[childTable.id] = childCenter; // Default to center
-        
+
         if (data.subtypePerimeterPoints && data.subtypePerimeterPoints.childPoints && data.subtypePerimeterPoints.childPoints[childTable.id]) {
+          // Adjust fieldIndex for top/bottom sides
+          let childFieldIndex = data.subtypePerimeterPoints.childPoints[childTable.id].fieldIndex;
+          if (data.subtypePerimeterPoints.childPoints[childTable.id].side === 'top') {
+            childFieldIndex = 0;
+          } else if (data.subtypePerimeterPoints.childPoints[childTable.id].side === 'bottom') {
+            childFieldIndex = childTable.fields.length - 1;
+          }
+
           const childPerim = getFieldPerimeterPoints(
             childTable,
-            data.subtypePerimeterPoints.childPoints[childTable.id].fieldIndex,
+            childFieldIndex,
             childTable.fields.length,
             hasColorStrip
           );
           actualChildPoints[childTable.id] = childPerim[data.subtypePerimeterPoints.childPoints[childTable.id].side] || childCenter;
         }
       });
-      
+
       // Calculate rotation angle in 90-degree increments based on direction to children
-      // The symbol should point towards the children (direction of specialization)
       let notationAngle = 0;
       if (isHorizontal) {
-        // Horizontal: check if children are to the right or left of subtype point
-        // Note: 0° makes lines point LEFT, 180° makes lines point RIGHT in the symbol design
         notationAngle = childrenCenter.x > subtypePoint.x ? 180 : 0;
       } else {
         // Vertical: check if children are below or above subtype point
         notationAngle = childrenCenter.y > subtypePoint.y ? 90 : -90;
       }
-      
+
       // Calculate orthogonal path from parent to subtype point
-      // Always use calculateOrthogonalPath for consistency (with or without waypoints)
       const parentToSubtypePath = calculateOrthogonalPath(
         actualParentPoint,
         subtypePoint,
         parentWaypoints // Empty array if no waypoints
       );
-      
+
       return (
         <g className="group">
           {/* Orthogonal path from parent to subtype point */}
@@ -648,17 +658,16 @@ export default function Relationship({
               x: childTable.x + childTable.width / 2,
               y: childTable.y + childTable.height / 2,
             };
-            // Calculate the connection point: fixed distance from subtype notation towards child
-            // This works for all directions (right, left, below, above)
+            // Calculate the connection point:
             const dx = childCenter.x - subtypePoint.x;
             const dy = childCenter.y - subtypePoint.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
+
             // Distance from notation symbol to connection point
             const notationOffset = data.subtype_restriction === SubtypeRestriction.DISJOINT_TOTAL
               ? (index % 2 === 0 ? 35 : 40)
               : 35;
-            
+
             const connectionPoint = {
               x: subtypePoint.x + (dx / distance) * notationOffset,
               y: subtypePoint.y + (dy / distance) * notationOffset
@@ -669,7 +678,6 @@ export default function Relationship({
             const actualChildPoint = actualChildPoints[childId] || childCenter;
 
             // Calculate orthogonal path from subtype point to child perimeter point
-            // Always use calculateOrthogonalPath for consistency (with or without waypoints)
             const childSpecificWaypoints = childWaypoints[childId] || [];
             const subtypeToChildPath = calculateOrthogonalPath(
               connectionPoint,
@@ -726,7 +734,7 @@ export default function Relationship({
                     {settings.notation === Notation.DEFAULT ? "(0,1)" : "(0,1)"}
                   </text>
                 )}
-                
+
                 {/* Render waypoints for this child if shown */}
                 {showSubtypeWaypoints && childSpecificWaypoints.map((waypoint, wpIndex) => (
                   <g key={`child-waypoint-${childId}-${wpIndex}`}>
@@ -1140,19 +1148,35 @@ export default function Relationship({
       // Recalculate actual positions based on current table positions
       const hasColorStrip = settings.notation === Notation.DEFAULT;
 
-      // Recalculate start point based on stored side and fieldIndex
+      // Adjust fieldIndex for top/bottom sides
+      let startFieldIndex = data.startPoint.fieldIndex;
+      if (data.startPoint.side === 'top') {
+        startFieldIndex = 0;
+      } else if (data.startPoint.side === 'bottom') {
+        startFieldIndex = startTable.fields.length - 1;
+      }
+
+      // Recalculate start point based on stored side and adjusted fieldIndex
       const startFieldPerimeter = getFieldPerimeterPoints(
         startTable,
-        data.startPoint.fieldIndex,
+        startFieldIndex,
         startTable.fields.length,
         hasColorStrip
       );
       actualStartPoint = startFieldPerimeter[data.startPoint.side] || startFieldPerimeter.right;
 
-      // Recalculate end point based on stored side and fieldIndex
+      // Adjust fieldIndex for top/bottom sides
+      let endFieldIndex = data.endPoint.fieldIndex || 0;
+      if (data.endPoint.side === 'top') {
+        endFieldIndex = 0;
+      } else if (data.endPoint.side === 'bottom') {
+        endFieldIndex = endTable.fields.length - 1;
+      }
+
+      // Recalculate end point based on stored side and adjusted fieldIndex
       const endFieldPerimeter = getFieldPerimeterPoints(
         endTable,
-        data.endPoint.fieldIndex || 0,
+        endFieldIndex,
         endTable.fields.length,
         hasColorStrip
       );

@@ -60,32 +60,46 @@ export default function RelationshipControls({ data }) {
   // IMPORTANT: All hooks must be called before any conditional returns
   const actualStartPoint = useMemo(() => {
     if (!data.startPoint || !startTable) return null;
-    const { side, fieldIndex } = data.startPoint;
+    let { side, fieldIndex } = data.startPoint;
     if (side === undefined || fieldIndex === undefined) return data.startPoint;
 
-    const perimeterPoints = getFieldPerimeterPoints(startTable, fieldIndex);
+    // Adjust fieldIndex for top/bottom sides to always point to first/last field
+    if (side === 'top') {
+      fieldIndex = 0;
+    } else if (side === 'bottom') {
+      fieldIndex = startTable.fields.length - 1;
+    }
+
+    const perimeterPoints = getFieldPerimeterPoints(startTable, fieldIndex, startTable.fields.length);
     return perimeterPoints[side] || data.startPoint;
-  }, [data.startPoint, startTable]);
+  }, [data.startPoint, startTable, startTable?.x, startTable?.y, startTable?.width, startTable?.height, startTable?.fields?.length]);
 
   const actualEndPoint = useMemo(() => {
     if (!data.endPoint || !endTable) return null;
-    const { side, fieldIndex } = data.endPoint;
+    let { side, fieldIndex } = data.endPoint;
     if (side === undefined || fieldIndex === undefined) return data.endPoint;
 
-    const perimeterPoints = getFieldPerimeterPoints(endTable, fieldIndex);
+    // Adjust fieldIndex for top/bottom sides to always point to first/last field
+    if (side === 'top') {
+      fieldIndex = 0;
+    } else if (side === 'bottom') {
+      fieldIndex = endTable.fields.length - 1;
+    }
+
+    const perimeterPoints = getFieldPerimeterPoints(endTable, fieldIndex, endTable.fields.length);
     return perimeterPoints[side] || data.endPoint;
-  }, [data.endPoint, endTable]);
+  }, [data.endPoint, endTable, endTable?.x, endTable?.y, endTable?.width, endTable?.height, endTable?.fields?.length]);
 
   // Get all available perimeter points for start and end tables
   const availableStartPoints = useMemo(() => {
     if (!startTable) return [];
     return getAllTablePerimeterPoints(startTable);
-  }, [startTable]);
+  }, [startTable, startTable?.x, startTable?.y, startTable?.width, startTable?.height, startTable?.fields?.length]);
 
   const availableEndPoints = useMemo(() => {
     if (!endTable) return [];
     return getAllTablePerimeterPoints(endTable);
-  }, [endTable]);
+  }, [endTable, endTable?.x, endTable?.y, endTable?.width, endTable?.height, endTable?.fields?.length]);
 
   // Multi-child subtype perimeter points logic - MUST be before early return
   const isMultiChildSubtype = data.subtype && data.endTableIds && data.endTableIds.length > 1;
@@ -110,16 +124,16 @@ export default function RelationshipControls({ data }) {
   const handlePerimeterMouseDown = (e, type, childId = null) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     // Get canvas element and coordinates using SVG transformation
     const svg = e.currentTarget.ownerSVGElement || document.getElementById('diagram') || document.querySelector('svg.canvas');
     if (!svg) return;
-    
+
     const pt = svg.createSVGPoint();
     pt.x = e.clientX;
     pt.y = e.clientY;
     const canvasPt = pt.matrixTransform(svg.getScreenCTM().inverse());
-    
+
     setMousePosition({ x: canvasPt.x, y: canvasPt.y });
     setIsDraggingPerimeter(true);
     setDraggingPerimeterType(type);
@@ -135,20 +149,20 @@ export default function RelationshipControls({ data }) {
       // Get canvas element and coordinates
       const svg = document.getElementById('diagram') || document.querySelector('svg.canvas') || document.querySelector('svg');
       if (!svg) return;
-      
+
       // Use SVG point transformation for accurate coordinates
       const pt = svg.createSVGPoint();
       pt.x = e.clientX;
       pt.y = e.clientY;
       const canvasPt = pt.matrixTransform(svg.getScreenCTM().inverse());
-      
+
       setMousePosition({ x: canvasPt.x, y: canvasPt.y });
 
       // Update perimeter point IN REAL-TIME during drag (like ConnectionPointHandles)
       if (draggingPerimeterType === 'parent') {
         const parentPerimeterPoints = getAllTablePerimeterPoints(startTable, hasColorStrip);
         const closestPoint = findClosestPerimeterPoint(parentPerimeterPoints, canvasPt.x, canvasPt.y, Infinity);
-        
+
         if (closestPoint && updateSubtypePerimeterPoints) {
           const currentChildPoints = data.subtypePerimeterPoints?.childPoints || {};
           updateSubtypePerimeterPoints(data.id, {
@@ -164,11 +178,11 @@ export default function RelationshipControls({ data }) {
         if (childTable) {
           const childPerimeterPoints = getAllTablePerimeterPoints(childTable, hasColorStrip);
           const closestPoint = findClosestPerimeterPoint(childPerimeterPoints, canvasPt.x, canvasPt.y, Infinity);
-          
+
           if (closestPoint && updateSubtypePerimeterPoints) {
             const currentParentPoint = data.subtypePerimeterPoints?.parentPoint || {};
             const currentChildPoints = data.subtypePerimeterPoints?.childPoints || {};
-            
+
             updateSubtypePerimeterPoints(data.id, {
               parentPoint: currentParentPoint,
               childPoints: {
@@ -276,50 +290,68 @@ export default function RelationshipControls({ data }) {
             {/* Parent table perimeter points */}
             {parentPerimeterPoints.map((point, idx) => {
               if (!point) return null;
+
+              // Normalize fieldIndex for comparison with saved point
+              let savedParentFieldIndex = data.subtypePerimeterPoints?.parentPoint?.fieldIndex;
+              const savedParentSide = data.subtypePerimeterPoints?.parentPoint?.side;
               
-              const isCurrentPoint = data.subtypePerimeterPoints && 
-                                     data.subtypePerimeterPoints.parentPoint &&
-                                     data.subtypePerimeterPoints.parentPoint.side === point.side &&
-                                     data.subtypePerimeterPoints.parentPoint.fieldIndex === point.fieldIndex;
-              
-              const closestPoint = isDraggingPerimeter && draggingPerimeterType === 'parent' 
+              if (savedParentSide === 'top') {
+                savedParentFieldIndex = 0;
+              } else if (savedParentSide === 'bottom') {
+                savedParentFieldIndex = startTable.fields.length - 1;
+              }
+
+              const isCurrentPoint = data.subtypePerimeterPoints &&
+                  data.subtypePerimeterPoints.parentPoint &&
+                  savedParentSide === point.side &&
+                  savedParentFieldIndex === point.fieldIndex;
+
+              const closestPoint = isDraggingPerimeter && draggingPerimeterType === 'parent'
                 ? findClosestPerimeterPoint(parentPerimeterPoints, mousePosition.x, mousePosition.y, Infinity)
                 : null;
               const isHovered = closestPoint && closestPoint.side === point.side && closestPoint.fieldIndex === point.fieldIndex;
-              
-              // Solo mostrar: el punto actual SIEMPRE, o todos los puntos durante el drag
+
+              // only show: current point ALWAYS, or all points during drag of THIS parent
               const shouldShow = isCurrentPoint || (isDraggingPerimeter && draggingPerimeterType === 'parent');
               if (!shouldShow) return null;
-              
+
               const handleMouseDown = (e) => {
                 if (isCurrentPoint) {
                   handlePerimeterMouseDown(e, 'parent');
                 }
               };
-              
-              // Mostrar puntos disponibles (grises) durante drag, punto actual (rojo) siempre
+
+              //Show available points (gray) during drag, current point (red) always
               const showAsAvailable = !isCurrentPoint && isDraggingPerimeter;
-              
+
               return (
                 <g key={`parent-perimeter-${idx}`}>
+                  {/* Larger invisible hit area for easier clicking */}
                   <circle
                     cx={point.x}
                     cy={point.y}
-                    r={isCurrentPoint ? 9 : (isHovered ? 8 : 7)}
-                    fill={isCurrentPoint ? "rgba(239, 68, 68, 0.3)" : (isHovered ? "rgba(239, 68, 68, 0.2)" : "rgba(156, 163, 175, 0.1)")}
-                    stroke={isCurrentPoint ? "#ef4444" : (isHovered ? "#ef4444" : "#9ca3af")}
-                    strokeWidth={isCurrentPoint ? 3 : (isHovered ? 2.5 : 1.5)}
+                    r="12"
+                    fill="transparent"
                     cursor={isCurrentPoint ? "move" : "default"}
                     onMouseDown={handleMouseDown}
                   />
+                  {/* Outer ring - unified style like ConnectionPointHandle */}
                   <circle
                     cx={point.x}
                     cy={point.y}
-                    r={isCurrentPoint ? 5 : (isHovered ? 4 : 3)}
-                    fill={isCurrentPoint ? "#ef4444" : (isHovered ? "#f87171" : "#d1d5db")}
-                    cursor={isCurrentPoint ? "move" : "default"}
-                    onMouseDown={handleMouseDown}
-                    pointerEvents={isCurrentPoint ? "all" : "none"}
+                    r={isHovered ? 8 : 7}
+                    fill="white"
+                    stroke={isCurrentPoint ? "#ef4444" : (isHovered ? "#ef4444" : "#9ca3af")}
+                    strokeWidth={isCurrentPoint ? 3 : (isHovered ? 2.5 : 2)}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  {/* Inner dot - red for parent/start */}
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r="3"
+                    fill="#ef4444"
+                    style={{ pointerEvents: 'none' }}
                   />
                 </g>
               );
@@ -329,69 +361,82 @@ export default function RelationshipControls({ data }) {
             {childTables.map((childTable) => {
               const childId = childTable.id;
               const childPerimeterPoints = getAllTablePerimeterPoints(childTable, hasColorStrip);
-              
+
               const savedChildPoint = data.subtypePerimeterPoints?.childPoints?.[childId];
-              
+
               // Verificar si el punto guardado existe en los puntos generados
               const savedPointExists = savedChildPoint && childPerimeterPoints.some(
                 p => p && p.side === savedChildPoint.side && p.fieldIndex === savedChildPoint.fieldIndex
               );
-              
+
               if (savedChildPoint && !savedPointExists) {
-                console.warn(`⚠️ Saved point for ${childTable.name} (${childId}) doesn't exist in generated points. Saved:`, savedChildPoint);
-                console.warn(`   Available sides:`, [...new Set(childPerimeterPoints.filter(p => p).map(p => p.side))]);
+                console.warn(`Saved point for ${childTable.name} (${childId}) doesn't exist in generated points. Saved:`, savedChildPoint);
+                console.warn(`Available sides:`, [...new Set(childPerimeterPoints.filter(p => p).map(p => p.side))]);
               }
 
               return childPerimeterPoints.map((point, idx) => {
                 if (!point) return null;
-                
+
                 const savedChildPoint = data.subtypePerimeterPoints?.childPoints?.[childId];
+
+                // Normalize fieldIndex for comparison with saved point
+                let savedChildFieldIndex = savedChildPoint?.fieldIndex;
+                const savedChildSide = savedChildPoint?.side;
                 
-                // Solo mostrar si el punto guardado coincide EXACTAMENTE con este punto
-                const isCurrentPoint = savedChildPoint && 
-                  point.side === savedChildPoint.side && 
-                  point.fieldIndex === savedChildPoint.fieldIndex;
-                
-                // Log solo para debug (remover después)
-                if (idx === 0 && savedChildPoint && !isCurrentPoint) {
-                  console.warn(`⚠️ ${childTable.name} (${childId}): Saved point doesn't match. Saved:`, savedChildPoint, 'Available:', childPerimeterPoints.filter(p => p).map(p => ({side: p.side, fieldIndex: p.fieldIndex})));
+                if (savedChildSide === 'top') {
+                  savedChildFieldIndex = 0;
+                } else if (savedChildSide === 'bottom') {
+                  savedChildFieldIndex = childTable.fields.length - 1;
                 }
-                
+
+                // Only show if saved point matches this point, or if dragging this child's perimeter
+                const isCurrentPoint = savedChildPoint &&
+                  point.side === savedChildSide &&
+                  point.fieldIndex === savedChildFieldIndex;
+
                 const closestPoint = isDraggingPerimeter && draggingPerimeterType === 'child' && draggingChildId === childId
                   ? findClosestPerimeterPoint(childPerimeterPoints, mousePosition.x, mousePosition.y, Infinity)
                   : null;
                 const isHovered = closestPoint && closestPoint.side === point.side && closestPoint.fieldIndex === point.fieldIndex;
-                
-                // Solo mostrar: el punto actual SIEMPRE, o todos los puntos durante el drag de ESTE child
+
+                // Only show: current point ALWAYS, or all points during drag of THIS child
                 const shouldShow = isCurrentPoint || (isDraggingPerimeter && draggingPerimeterType === 'child' && draggingChildId === childId);
                 if (!shouldShow) return null;
-                
+
                 const handleMouseDown = (e) => {
                   if (isCurrentPoint) {
                     handlePerimeterMouseDown(e, 'child', childId);
                   }
                 };
-                
+
                 return (
                   <g key={`child-perimeter-${childId}-${idx}`}>
+                    {/* Larger invisible hit area for easier clicking */}
                     <circle
                       cx={point.x}
                       cy={point.y}
-                      r={isCurrentPoint ? 9 : (isHovered ? 8 : 7)}
-                      fill={isCurrentPoint ? "rgba(59, 130, 246, 0.3)" : (isHovered ? "rgba(59, 130, 246, 0.2)" : "rgba(156, 163, 175, 0.1)")}
-                      stroke={isCurrentPoint ? "#3b82f6" : (isHovered ? "#3b82f6" : "#9ca3af")}
-                      strokeWidth={isCurrentPoint ? 3 : (isHovered ? 2.5 : 1.5)}
+                      r="12"
+                      fill="transparent"
                       cursor={isCurrentPoint ? "move" : "default"}
                       onMouseDown={handleMouseDown}
                     />
+                    {/* Outer ring - unified style like ConnectionPointHandle */}
                     <circle
                       cx={point.x}
                       cy={point.y}
-                      r={isCurrentPoint ? 5 : (isHovered ? 4 : 3)}
-                      fill={isCurrentPoint ? "#3b82f6" : (isHovered ? "#60a5fa" : "#d1d5db")}
-                      cursor={isCurrentPoint ? "move" : "default"}
-                      onMouseDown={handleMouseDown}
-                      pointerEvents={isCurrentPoint ? "all" : "none"}
+                      r={isHovered ? 8 : 7}
+                      fill="white"
+                      stroke={isCurrentPoint ? "#3b82f6" : (isHovered ? "#3b82f6" : "#9ca3af")}
+                      strokeWidth={isCurrentPoint ? 3 : (isHovered ? 2.5 : 2)}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    {/* Inner dot - blue for child/end */}
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r="3"
+                      fill="#3b82f6"
+                      style={{ pointerEvents: 'none' }}
                     />
                   </g>
                 );

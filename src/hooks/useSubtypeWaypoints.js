@@ -105,7 +105,7 @@ export function useSubtypeWaypoints(relationship, tables, onUpdate) {
     setDraggedWaypoint({ type, index, childId });
 
     dragStartPos.current = { x: e.clientX, y: e.clientY };
-    
+
     // Get current waypoint position using refs
     let waypoint;
     if (type === 'parent') {
@@ -113,7 +113,7 @@ export function useSubtypeWaypoints(relationship, tables, onUpdate) {
     } else if (type === 'child' && childId !== null) {
       waypoint = (childWaypointsRef.current[childId] || [])[index];
     }
-    
+
     if (waypoint) {
       waypointStartPos.current = { x: waypoint.x, y: waypoint.y };
     }

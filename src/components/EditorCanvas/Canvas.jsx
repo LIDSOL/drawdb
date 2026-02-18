@@ -115,7 +115,7 @@ export default function Canvas() {
     useUndoRedo();
 
   const { selectedElement, setSelectedElement } = useSelect();
-  
+
   const [dragging, setDragging] = useState({
     element: ObjectType.NONE,
     id: -1,
@@ -2734,7 +2734,7 @@ export default function Canvas() {
 
     if (coordsDidUpdate(dragging.element)) {
       const info = getMovedElementDetails();
-      
+
       // Adjust waypoints for moved tables
       if (dragging.element === ObjectType.TABLE) {
         if (Array.isArray(dragging.id)) {
@@ -2755,7 +2755,7 @@ export default function Canvas() {
           adjustWaypointsForTableMove(dragging.id, deltaX, deltaY);
         }
       }
-      
+
       // Use pushUndo to ensure centralized filtering/deduplication
       pushUndo(
         (() => {
@@ -2999,7 +2999,7 @@ export default function Canvas() {
       (f) => f.id === linkingLine.startFieldId,
     );
     const relationshipName = `${parentTable.name}_${actualStartFieldId ? actualStartFieldId.name : "table"}`;
-    
+
     // Calculate perimeter points for start and end
     const hasColorStrip = settings.notation === Notation.DEFAULT;
     const startFieldIndex = parentTable.fields.findIndex(f => f.id === linkingLine.startFieldId);
@@ -3009,7 +3009,7 @@ export default function Canvas() {
       parentTable.fields.length,
       hasColorStrip
     );
-    
+
     // Get all perimeter points for end table to find closest one
     const endTablePerimeterPoints = getAllTablePerimeterPoints(childTable, hasColorStrip);
     const closestEndPoint = findClosestPerimeterPoint(
@@ -3018,7 +3018,7 @@ export default function Canvas() {
       linkingLine.endY,
       50 // threshold
     );
-    
+
     // Use the updated childTable fields to create the new relationship
     const newRelationship = {
       startTableId: linkingLine.startTableId,
@@ -3127,7 +3127,7 @@ export default function Canvas() {
     }
     // Add the new child table to the existing subtype relationship
     addChildToSubtype(hierarchyLinkingLine.relationshipId, targetTableId);
-    
+
     // If a perimeter point was selected, update the relationship
     // Use setTimeout to ensure this happens after auto-initialization
     if (hierarchyLinkingLine.selectedPerimeterPoint) {
@@ -3150,7 +3150,7 @@ export default function Canvas() {
         }
       }, 50);
     }
-    
+
     setHierarchyLinking(false);
     // Force a re-render to ensure UI updates properly
     setTimeout(() => {}, 100);
@@ -3351,8 +3351,8 @@ export default function Canvas() {
             if (!parentTable) return null;
 
             const hasColorStrip = settings.notation === Notation.DEFAULT;
-            
-            // Mostrar puntos perimetrales de la tabla hovered (hijo potencial)
+
+            // show perimeter points for hovered table (potential child)
             const hoveredTablePerimeters = hoveredTable.tableId >= 0 && (() => {
               const targetTable = tables.find(t => t.id === hoveredTable.tableId);
               if (!targetTable) return null;
@@ -3362,7 +3362,7 @@ export default function Canvas() {
               const handlePerimeterPointClick = (e, point) => {
                 e.stopPropagation();
                 e.preventDefault();
-                
+
                 // Update the hierarchy linking line with the selected point
                 setHierarchyLinkingLine(prev => ({
                   ...prev,
@@ -3375,7 +3375,7 @@ export default function Canvas() {
                   endX: point.x,
                   endY: point.y
                 }));
-                
+
                 // Complete the hierarchy linking
                 handleHierarchyLinking();
               };
@@ -3409,16 +3409,16 @@ export default function Canvas() {
               );
             })();
 
-            // Mostrar puntos perimetrales de la tabla padre si no tiene punto asignado aún
-            const parentTablePerimeters = (!originalRelationship.subtypePerimeterPoints || 
+            // show parent perimeter points if no parent point assigned yet (only allow setting one parent point, but show all until one is selected)
+            const parentTablePerimeters = (!originalRelationship.subtypePerimeterPoints ||
               !originalRelationship.subtypePerimeterPoints.parentPoint) && (() => {
-              
+
               const parentPerimeterPoints = getAllTablePerimeterPoints(parentTable, hasColorStrip);
 
               const handleParentPerimeterClick = (e, point) => {
                 e.stopPropagation();
                 e.preventDefault();
-                
+
                 // Update the parent perimeter point
                 if (updateSubtypePerimeterPoints) {
                   const currentChildPoints = originalRelationship.subtypePerimeterPoints?.childPoints || {};
@@ -3429,7 +3429,7 @@ export default function Canvas() {
                     },
                     childPoints: currentChildPoints
                   });
-                  
+
                   Toast.success(t("parent_perimeter_point_set") || "Punto perimetral padre establecido");
                 }
               };
@@ -3533,7 +3533,7 @@ export default function Canvas() {
               onContextMenu={handleNoteContextMenu}
             />
           ))}
-          
+
           {/* Render relationship controls (waypoints/handles) AFTER tables to ensure they're on top */}
           {relationships
             .filter((rel) => {
