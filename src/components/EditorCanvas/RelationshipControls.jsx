@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { useSelect, useWaypointEditor, useSubtypeWaypoints, useDiagram, useSettings } from "../../hooks";
+import { useSelect, useWaypointEditor, useDiagram, useSettings } from "../../hooks";
 import { WaypointContainer } from "./WaypointHandle";
 import { ConnectionPointHandles } from "./ConnectionPointHandle";
 import { ObjectType, Notation } from "../../data/constants";
@@ -72,6 +72,7 @@ export default function RelationshipControls({ data }) {
 
     const perimeterPoints = getFieldPerimeterPoints(startTable, fieldIndex, startTable.fields.length);
     return perimeterPoints[side] || data.startPoint;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.startPoint, startTable, startTable?.x, startTable?.y, startTable?.width, startTable?.height, startTable?.fields?.length]);
 
   const actualEndPoint = useMemo(() => {
@@ -88,17 +89,20 @@ export default function RelationshipControls({ data }) {
 
     const perimeterPoints = getFieldPerimeterPoints(endTable, fieldIndex, endTable.fields.length);
     return perimeterPoints[side] || data.endPoint;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.endPoint, endTable, endTable?.x, endTable?.y, endTable?.width, endTable?.height, endTable?.fields?.length]);
 
   // Get all available perimeter points for start and end tables
   const availableStartPoints = useMemo(() => {
     if (!startTable) return [];
     return getAllTablePerimeterPoints(startTable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startTable, startTable?.x, startTable?.y, startTable?.width, startTable?.height, startTable?.fields?.length]);
 
   const availableEndPoints = useMemo(() => {
     if (!endTable) return [];
     return getAllTablePerimeterPoints(endTable);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endTable, endTable?.x, endTable?.y, endTable?.width, endTable?.height, endTable?.fields?.length]);
 
   // Multi-child subtype perimeter points logic - MUST be before early return
@@ -198,7 +202,7 @@ export default function RelationshipControls({ data }) {
       }
     };
 
-    const handleUp = (e) => {
+    const handleUp = () => {
       setIsDraggingPerimeter(false);
       setDraggingPerimeterType(null);
       setDraggingChildId(null);
@@ -320,9 +324,6 @@ export default function RelationshipControls({ data }) {
                   handlePerimeterMouseDown(e, 'parent');
                 }
               };
-
-              //Show available points (gray) during drag, current point (red) always
-              const showAsAvailable = !isCurrentPoint && isDraggingPerimeter;
 
               return (
                 <g key={`parent-perimeter-${idx}`}>

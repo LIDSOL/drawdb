@@ -6,7 +6,6 @@ import { useState, useRef, useCallback } from "react";
  */
 function PerimeterPointSelector({
   points,
-  currentPoint,
   closestPointIndex, // Index of the closest point to drag position
   type, // 'start' or 'end' - determines color of inner dot
 }) {
@@ -17,10 +16,6 @@ function PerimeterPointSelector({
     <g style={{ pointerEvents: 'none' }}>
       {/* Render all available points */}
       {points.map((point, idx) => {
-        const isCurrent = currentPoint &&
-          point.x === currentPoint.x &&
-          point.y === currentPoint.y &&
-          point.side === currentPoint.side;
         const isClosest = closestPointIndex === idx;
 
         return (

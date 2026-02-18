@@ -36,6 +36,7 @@ export function useSubtypeWaypoints(relationship, tables, onUpdate) {
       setParentWaypoints([]);
       setChildWaypoints({});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [relationship?.id, relationship?.subtypeWaypoints]);
 
   // Add waypoint to parent line

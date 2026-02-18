@@ -35,24 +35,6 @@ import {
 
 const labelFontSize = 16;
 
-// Helper function to create simple orthogonal path between two points (shortest route)
-function createSimpleOrthogonalPath(start, end) {
-  if (!start || !end) return '';
-
-  const dx = Math.abs(end.x - start.x);
-  const dy = Math.abs(end.y - start.y);
-
-  // Determine if we should go horizontal-first or vertical-first
-  // Choose the dominant direction first
-  if (dx > dy) {
-    // Horizontal dominant: go horizontal first, then vertical
-    return `M ${start.x} ${start.y} L ${end.x} ${start.y} L ${end.x} ${end.y}`;
-  } else {
-    // Vertical dominant: go vertical first, then horizontal
-    return `M ${start.x} ${start.y} L ${start.x} ${end.y} L ${end.x} ${end.y}`;
-  }
-}
-
 export default function Relationship({
   data,
   onConnectSubtypePoint,
@@ -457,7 +439,7 @@ export default function Relationship({
       selectedElement.id === data.id;
 
     setShowSubtypeWaypoints(isSelected);
-  }, [selectedElement, data.id, isMultiChildSubtype]);
+  }, [selectedElement, data.id, isMultiChildSubtype, setShowSubtypeWaypoints]);
 
   // Add global mouse event listeners for subtype waypoint dragging
   useEffect(() => {
