@@ -8,7 +8,11 @@ function PerimeterPointSelector({
   points,
   currentPoint,
   closestPointIndex, // Index of the closest point to drag position
+  type, // 'start' or 'end' - determines color of inner dot
 }) {
+  // Determine inner dot color based on type
+  const innerDotColor = type === 'start' ? '#ef4444' : '#3b82f6'; // Red for start, blue for end
+
   return (
     <g style={{ pointerEvents: 'none' }}>
       {/* Render all available points */}
@@ -21,27 +25,25 @@ function PerimeterPointSelector({
 
         return (
           <g key={`perimeter-${idx}`} style={{ pointerEvents: 'none' }}>
-            {/* Visual indicator */}
+            {/* Outer ring */}
             <circle
               cx={point.x}
               cy={point.y}
-              r="8"
-              fill={isClosest ? "#60a5fa" : (isCurrent ? "#10b981" : "white")}
-              stroke={isClosest ? "#3b82f6" : (isCurrent ? "#059669" : "#9ca3af")}
-              strokeWidth={isClosest ? "3" : "2"}
+              r="7"
+              fill="white"
+              stroke={isClosest ? innerDotColor : "#9ca3af"}
+              strokeWidth={isClosest ? "2.5" : "2"}
               style={{ pointerEvents: 'none' }}
             />
 
-            {/* Inner dot */}
-            {(isCurrent || isClosest) && (
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="4"
-                fill={isClosest ? "#3b82f6" : "#059669"}
-                style={{ pointerEvents: 'none' }}
-              />
-            )}
+            {/* Inner dot - always visible with type color */}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="3"
+              fill={innerDotColor}
+              style={{ pointerEvents: 'none' }}
+            />
           </g>
         );
       })}
@@ -203,7 +205,7 @@ export function ConnectionPointHandles({
     e.stopPropagation();
     e.preventDefault();
 
-    console.log('Handle mouse down:', type, 'availablePoints:', 
+    console.log('Handle mouse down:', type, 'availablePoints:',
       type === 'start' ? availableStartPoints?.length : availableEndPoints?.length);
 
     draggingTypeRef.current = type;
@@ -240,6 +242,7 @@ export function ConnectionPointHandles({
           points={availableStartPoints}
           currentPoint={startPoint}
           closestPointIndex={closestStartIdx}
+          type="start"
         />
       )}
 
@@ -248,6 +251,7 @@ export function ConnectionPointHandles({
           points={availableEndPoints}
           currentPoint={endPoint}
           closestPointIndex={closestEndIdx}
+          type="end"
         />
       )}
 
