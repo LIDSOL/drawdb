@@ -122,6 +122,7 @@ export default function TableField({ data, tid, index }) {
         </Col>
         <Col span={8}>
           <Select
+          disabled={!!data.foreignK}
             className="w-full"
             optionList={[
               ...Object.keys(dbToTypes[database]).map((value) => ({
@@ -303,6 +304,7 @@ export default function TableField({ data, tid, index }) {
             <>
               <Col span={12}>
                 <InputNumber
+                  disabled={data.foreignK}
                   placeholder="Precision"
                   value={
                     data.size && data.size.includes(",")
@@ -344,6 +346,7 @@ export default function TableField({ data, tid, index }) {
               </Col>
               <Col span={12}>
                 <InputNumber
+                  disabled={data.foreignK}
                   placeholder="Scale"
                   value={
                     data.size && data.size.includes(",")
@@ -394,6 +397,7 @@ export default function TableField({ data, tid, index }) {
           ) : (
             <Col span={24}>
               <InputNumber
+                disabled={data.foreignK}
                 placeholder={t("Length/Size")}
                 value={data.size}
                 className="w-full"

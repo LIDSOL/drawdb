@@ -240,6 +240,42 @@ export default function DiagramContextProvider({ children }) {
             fields: newFields,
           };
         }
+        if (updatedValues.type||updatedValues.precision!=undefined||updatedValues.scale!=undefined||updatedValues.size!=undefined) {
+          const updatedFields = table.fields.map((f) => {
+            if (f.foreignK === true && f.foreignKey?.tableId === tid && f.foreignKey?.fieldId === fid) {
+              
+              const newType = updatedValues.type || f.type;
+              const dbSettings = settings?.defaultTypeSizes?.[database];
+              const typeDefaultConfig = dbSettings[newType];
+              
+              let newPrecision = f.precision;
+              let newScale = f.scale;
+              let newSize = f.size;
+
+              if (updatedValues.type !== undefined) {
+                if (typeof typeDefaultConfig === 'object') {
+                  newPrecision = typeDefaultConfig.precision ?? 10;
+                  newScale = typeDefaultConfig.scale ?? 2;
+                } else if (typeof typeDefaultConfig === 'number') {
+                    newSize = typeDefaultConfig;
+                }
+              }
+              if (updatedValues.precision !== undefined) newPrecision = updatedValues.precision;
+              if (updatedValues.scale !== undefined) newScale = updatedValues.scale;
+              if (updatedValues.size !== undefined) newSize = updatedValues.size;
+
+              return { 
+                ...f, 
+                type: newType,
+                precision: newPrecision,
+                scale: newScale,
+                size: newSize
+              };
+            }
+            return f;
+          });
+          return { ...table, fields: updatedFields };
+        }
         return table;
       }),
     );
