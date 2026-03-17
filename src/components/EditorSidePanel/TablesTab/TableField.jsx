@@ -122,6 +122,7 @@ export default function TableField({ data, tid, index }) {
         </Col>
         <Col span={8}>
           <Select
+          disabled={!!data.foreignK}
             className="w-full"
             optionList={[
               ...Object.keys(dbToTypes[database]).map((value) => ({
