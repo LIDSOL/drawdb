@@ -661,7 +661,7 @@ export default function Table(props) {
               onClick={() => deleteField(fieldData, tableData.id)}
             />
           ) : (
-            <div className="flex gap-1 items-center">
+            <div className="flex gap-1 items-center flex-nowrap whitespace-nowrap">
               {fieldData.primary && (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
