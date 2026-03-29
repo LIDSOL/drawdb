@@ -6,6 +6,7 @@ import {
   IconEdit2Stroked,
   IconCheckboxTick,
   IconMinus,
+  IconColorPalette,
 } from "@douyinfe/semi-icons";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks";
@@ -25,6 +26,7 @@ export default function FieldContextMenu({
   onToggleUnique,
   onToggleAutoIncrement,
   onEditProperties,
+  onSetForeignKeyColor,
 }) {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -121,6 +123,15 @@ export default function FieldContextMenu({
         onClose();
       },
     },
+    // Only show FK color option for foreign key fields
+    ...(field?.foreignK ? [{
+      label: `Set ${t("foreign_key")} Color`,
+      icon: <IconColorPalette />,
+      onClick: () => {
+        onSetForeignKeyColor();
+        onClose();
+      },
+    }] : []),
     {
       type: "divider",
     },

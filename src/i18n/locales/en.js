@@ -163,6 +163,7 @@ const en = {
     title: "Title",
     not_set: "Not set",
     foreign: "Foreign",
+    foreign_key: "Foreign Key",
     relationship_type: "Relationship type",
     cardinality: "Cardinality",
     on_update: "On update",

@@ -154,6 +154,7 @@ const es = {
     title: "Título",
     not_set: "No establecido",
     foreign: "Extranjero",
+    foreign_key: "Clave Foránea",
     relationship_type: "Tipo de relación",
     cardinality: "Cardinalidad",
     on_update: "Al actualizar",
